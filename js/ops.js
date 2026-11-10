@@ -2,7 +2,7 @@
 (function () {
   const K = window.K, ops = (K.ops = {});
   const shiftLine = (l, d) => {
-    l.units.forEach((u) => { u.s += d; if (u.e != null) u.e += d; });
+    l.units.forEach((u) => { u.s += d; if (u.m) u.m = u.m.map((v) => v + d); });
     l.end += d; if (l.showAt != null) l.showAt += d; if (l.hideAt != null) l.hideAt += d;
     K.fixLine(l);
   };
@@ -46,22 +46,18 @@
     K.fixLine(l); K.commit();
   };
   ops.set = (l, k, v) => { l[k] = v; K.commit(); };
-  /* 打点：播放时每按一次，把选中行的下一个字的开始时间设为当前时间 */
+  /* 打点：播放时每按一次，把选中行的下一个字（带注音的字按拍）的开始时间设为当前时间 */
   ops.tap = (t) => {
     const l = K.sel(); if (!l) return;
-    let i = K.ui.tapIdx;
-    if (i >= l.units.length) {            // 最后再按一次 = 这一行结束，跳到下一行
-      l.end = Math.max(t, l.units[l.units.length - 1].s + 0.05); K.commit();
+    const B = K.bounds(l); let i = K.ui.tapIdx;
+    if (i >= B.length) {                   // 最后再按一次 = 这一行结束，跳到下一行
+      l.end = Math.max(t, l.units[l.units.length - 1].s + 0.05); K.fixLine(l); K.commit();
       const sc = K.screen(), nx = sc.ord[sc.ord.indexOf(l) + 1];
-      if (nx) K.select(nx.id); else K.ui.tapIdx = l.units.length;
+      if (nx) K.select(nx.id); else K.ui.tapIdx = B.length;
       return;
     }
-    l.units[i].s = t; delete l.units[i].e;
-    for (let k = 0; k < i; k++) { if (l.units[k].s > t) l.units[k].s = t; if (l.units[k].e > t) delete l.units[k].e; }
-    for (let k = i + 1; k < l.units.length; k++) if (l.units[k].s < t) l.units[k].s = t;
-    i++;
-    while (i < l.units.length && !/[^\s\p{P}]/u.test(l.units[i].t)) { l.units[i].s = Math.max(l.units[i].s, t); i++; }   // 空格、标点自动带过
-    if (l.end < t + 0.05) l.end = t + 0.05;
-    K.fixLine(l); K.ui.tapIdx = i; K.commit();
+    K.setBoundary(l, B[i].i, B[i].j, t); i++;
+    while (i < B.length && !/[^\s\p{P}]/u.test(l.units[B[i].i].t)) i++;      // 空格、标点自动带过
+    K.ui.tapIdx = i; K.commit();
   };
 })();

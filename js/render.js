@@ -98,8 +98,10 @@
   K.progressEdge = (l, L, t) => {
     let edge = 0;
     l.units.forEach((u, i) => {
-      const e = K.unitEnd(l, i), p = Math.min(1, Math.max(0, (t - u.s) / (e - u.s)));
-      if (p > 0) edge = Math.max(edge, L.units[i].x + L.units[i].w * p);
+      if (t <= u.s) return;
+      const T = K.subTimes(l, i), n = T.length - 1; let p = 1;
+      for (let j = 0; j < n; j++) if (t < T[j + 1]) { p = (j + (T[j + 1] > T[j] ? (t - T[j]) / (T[j + 1] - T[j]) : 1)) / n; break; }
+      edge = Math.max(edge, L.units[i].x + L.units[i].w * p);
     });
     return edge;
   };
@@ -108,7 +110,7 @@
     if (x <= 0) return K.ls(l);
     for (let i = 0; i < l.units.length; i++) {
       const m = L.units[i];
-      if (x <= m.x + m.w) { const p = m.w ? (x - m.x) / m.w : 0; return l.units[i].s + p * (K.unitEnd(l, i) - l.units[i].s); }
+      if (x <= m.x + m.w) { const T = K.subTimes(l, i), n = T.length - 1, f = (m.w ? (x - m.x) / m.w : 0) * n, j = Math.min(n - 1, Math.floor(f)); return T[j] + (f - j) * (T[j + 1] - T[j]); }
     }
     return l.end;
   };

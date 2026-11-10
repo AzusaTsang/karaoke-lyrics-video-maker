@@ -70,8 +70,10 @@
       <div class="row"><label>出现时间</label><input data-k="showAt" type="number" step="0.05" value="${I.show.toFixed(2)}"><button data-a="autoShow" ${l.showAt == null ? 'disabled' : ''}>${l.showAt == null ? '自动' : '恢复自动'}</button></div>
       <div class="row"><label>消失时间</label><input data-k="hideAt" type="number" step="0.05" value="${I.hide.toFixed(2)}"><button data-a="autoHide" ${l.hideAt == null ? 'disabled' : ''}>${l.hideAt == null ? '自动' : '恢复自动'}</button></div>
       <div class="btns"><button data-a="m50">−50ms</button><button data-a="p50">+50ms</button><button data-a="even">逐字等分</button><button data-a="dup">复制为和声行</button><button data-a="split">播放头处拆分</button><button data-a="merge">合并下一行</button><button data-a="del" class="danger">删除</button></div>
-      <div class="hint">打点校时：播放时按 <kbd>T</kbd>，每按一次给下一个字打上开始时间（当前第 ${Math.min(K.ui.tapIdx + 1, l.units.length)} / ${l.units.length} 个字，最后再按一次 = 行结束并跳到下一行）。</div>
-      <table><thead><tr><th>字</th><th>注音</th><th>开始(s)</th><th></th></tr></thead><tbody>${l.units.map((u, i) => `<tr class="${i === K.ui.tapIdx ? 'cur' : ''}"><td>${esc(u.t) || '&nbsp;'}</td><td><input data-k="r${i}" data-r="${i}" value="${esc(u.r || '')}"></td><td><input data-k="s${i}" data-s="${i}" type="number" step="0.01" value="${u.s.toFixed(2)}"></td><td><button data-n="${i}" title="把这个字的开始设为当前播放时间">＠</button></td></tr>`).join('')}</tbody></table>`;
+      <div class="hint">打点校时：播放时按 <kbd>T</kbd>，每按一次给下一个字打上开始时间，带注音的字按假名一拍一拍打（当前第 ${Math.min(K.ui.tapIdx + 1, K.bounds(l).length)} / ${K.bounds(l).length} 拍，最后再按一次 = 行结束并跳到下一行）。</div>
+      <table><thead><tr><th>字</th><th>注音</th><th>开始(s)</th><th></th></tr></thead><tbody>${(() => { const B = K.bounds(l), cur = B[K.ui.tapIdx] || {}; return l.units.map((u, i) => { const T = K.subTimes(l, i), ms = K.moras(u.r), bi = B.findIndex((b) => b.i === i);
+        return `<tr class="${cur.i === i && !cur.j ? 'cur' : ''}"><td>${esc(u.t) || '&nbsp;'}</td><td><input data-k="r${i}" data-r="${i}" value="${esc(u.r || '')}"></td><td><input data-k="s${i}" data-b="${bi}" type="number" step="0.01" value="${u.s.toFixed(2)}"></td><td><button data-n="${bi}" title="把这个字的开始设为当前播放时间">＠</button></td></tr>` +
+          ms.slice(1).map((m, q) => `<tr class="sub${cur.i === i && cur.j === q + 1 ? ' cur' : ''}"><td></td><td class="mora">└ ${esc(m)}</td><td><input data-k="b${bi + q + 1}" data-b="${bi + q + 1}" type="number" step="0.01" value="${T[q + 1].toFixed(2)}"></td><td><button data-n="${bi + q + 1}" title="把这一拍的开始设为当前播放时间">＠</button></td></tr>`).join(''); }).join(''); })()}</tbody></table>`;
     if (foc) { const f = el.querySelector(`[data-k="${foc}"]`); if (f) f.focus(); }
   }
   function lineEvents() {
@@ -88,7 +90,7 @@
       else if (d.k === 'showAt') K.ops.set(l, 'showAt', Math.min(parseFloat(v), K.ls(l) - 0.05));
       else if (d.k === 'hideAt') K.ops.set(l, 'hideAt', Math.max(parseFloat(v), K.ls(l) + 0.1));
       else if (d.r != null) { l.units[+d.r].r = v || null; K.commit(); }
-      else if (d.s != null) { const i = +d.s; l.units[i].s = parseFloat(v) || 0; delete l.units[i].e; for (let k = i + 1; k < l.units.length; k++) if (l.units[k].s < l.units[i].s) l.units[k].s = l.units[i].s; for (let k = 0; k < i; k++) if (l.units[k].s > l.units[i].s) l.units[k].s = l.units[i].s; K.fixLine(l); K.commit(); }
+      else if (d.b != null) { const b = K.bounds(l)[+d.b]; if (b && !isNaN(parseFloat(v))) { K.setBoundary(l, b.i, b.j, parseFloat(v)); K.commit(); } }
     });
     el.addEventListener('click', (e) => {
       const l = K.sel(), d = e.target.dataset; if (!l) return;

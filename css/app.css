@@ -71,3 +71,4 @@ tr.cur td:first-child{color:#ffd84d}
 body.rec #top,body.rec #left,body.rec #right,body.rec #tl,body.rec #bar{display:none}
 body.rec #app{display:block}body.rec #center{height:100%;padding:0}
 body.rec #stageBox{border:0;border-radius:0;background:#000}
+tr.sub td{border-bottom-color:#1c2026}td.mora{color:var(--mut);font-family:"Yu Gothic UI",sans-serif;padding-left:8px}tr.cur td.mora{color:#ffd84d}

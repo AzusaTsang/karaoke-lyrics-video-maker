@@ -19,20 +19,12 @@
     }
     return null;
   }
-  /* 校时：把“当前时间”钉在离鼠标最近的字边界上 */
+  /* 校时：把“当前时间”钉在离鼠标最近的边界上（字的开头；带注音的字还包括每一拍） */
+  const bx = (L, b, l) => L.units[b.i].x + (L.units[b.i].w * b.j) / K.nMora(l.units[b.i]);
   function retime(l, o, b, T) {
-    l.units.forEach((x, i) => { x.s = o.units[i].s; if (o.units[i].e != null) x.e = o.units[i].e; else delete x.e; });
-    l.end = o.end;
-    const n = l.units.length;
-    if (b < n) {
-      l.units[b].s = T; delete l.units[b].e;
-      for (let k = 0; k < b; k++) { if (l.units[k].s > T) l.units[k].s = T; if (l.units[k].e != null && l.units[k].e > T) delete l.units[k].e; }
-      for (let k = b + 1; k < n; k++) if (l.units[k].s < T) l.units[k].s = T;
-      if (l.end < T + 0.05) l.end = T + 0.05;
-    } else {
-      l.end = T; l.units.forEach((x) => { if (x.s > T - 0.02) x.s = T - 0.02; });
-    }
-    K.fixLine(l);
+    l.units = JSON.parse(o.units); l.end = o.end;
+    if (b) K.setBoundary(l, b.i, b.j, T);
+    else { l.end = T; l.units.forEach((x) => { if (x.s > T - 0.02) x.s = T - 0.02; if (x.m) x.m = x.m.map((v) => Math.min(v, T - 0.02)); }); K.fixLine(l); }
   }
   function move(e) {
     const p = pt(e);
@@ -40,9 +32,10 @@
     const l = drag.l, I = K.screen().info.get(l.id); if (!I) return;
     const G = K.geo(l, I, cv.width, cv.height), x = (p.x - G.x0) / G.s;
     if (drag.mode === 'scrub') { K.seek(K.edgeToTime(l, G.L, x) + K.S().offset); return; }
-    let b = l.units.length, best = Math.abs(x - G.L.total);
-    G.L.units.forEach((m, i) => { const d = Math.abs(x - m.x); if (d < best) { best = d; b = i; } });
-    if (b !== drag.b) { drag.b = b; drag.changed = true; retime(l, drag.orig, b, drag.T); K.touch(); }
+    let b = null, best = Math.abs(x - G.L.total);                       // null = 行结束
+    K.bounds(l).forEach((c) => { const d = Math.abs(x - bx(G.L, c, l)); if (d < best) { best = d; b = c; } });
+    const key = b ? b.i + ':' + b.j : 'end';
+    if (key !== drag.b) { drag.b = key; drag.changed = true; retime(l, drag.orig, b, drag.T); K.touch(); }
   }
   K.initStage = () => {
     cv = document.getElementById('cv'); ctx = cv.getContext('2d');
@@ -53,7 +46,7 @@
       K.select(h.v.l.id);
       if (h.type !== 'cursor') return;
       K.pause(); try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-      drag = { l: h.v.l, mode: K.ui.tool, T: K.r3(te()), b: -1, changed: false, orig: JSON.parse(JSON.stringify({ units: h.v.l.units, end: h.v.l.end })) };
+      drag = { l: h.v.l, mode: K.ui.tool, T: K.r3(te()), b: '', changed: false, orig: { units: JSON.stringify(h.v.l.units), end: h.v.l.end } };
       move(e);
     });
     cv.addEventListener('pointermove', move);
@@ -76,7 +69,7 @@
       if (sel) { g.strokeStyle = 'rgba(90,169,255,.9)'; g.lineWidth = 1.5 * U; g.setLineDash([6 * U, 4 * U]); g.strokeRect(G.x0 - 8 * U, top - 4 * U, G.w + 16 * U, bot - top + 8 * U); g.setLineDash([]); }
       if (drag && drag.l === v.l && drag.mode === 'retime') {          // 拖动时显示所有字边界
         g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1 * U;
-        G.L.units.map((m) => m.x).concat([G.L.total]).forEach((bx) => { const X = G.x0 + bx * G.s; g.beginPath(); g.moveTo(X, bot + 2 * U); g.lineTo(X, bot + 10 * U); g.stroke(); });
+        K.bounds(v.l).map((c) => [bx(G.L, c, v.l), c.j]).concat([[G.L.total, 0]]).forEach((q) => { const X = G.x0 + q[0] * G.s; g.beginPath(); g.moveTo(X, q[1] ? top - 6 * U : bot + 2 * U); g.lineTo(X, q[1] ? top + 2 * U : bot + 10 * U); g.stroke(); });
       }
       const ex = edgeX(v, t), col = sel ? '#5aa9ff' : 'rgba(255,255,255,.75)';
       g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 4 * U; g.beginPath(); g.moveTo(ex, top); g.lineTo(ex, bot + 12 * U); g.stroke();

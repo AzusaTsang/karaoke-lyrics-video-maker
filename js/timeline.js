@@ -17,7 +17,7 @@
     const l = c.find((x) => x.id === K.ui.sel) || c.find((x) => t >= K.ls(x) && t <= x.end) || c[0], I = sc.info.get(l.id);
     if (l.id === K.ui.sel && yIn > TRK * 0.5) {
       let bi = -1, bd = 6;
-      l.units.forEach((u, i) => { const d = Math.abs(LX(u.s) - x); if (d < bd) { bd = d; bi = i; } });
+      const B = K.bounds(l); B.forEach((b, i) => { const d = Math.abs(LX(K.boundTime(l, b)) - x); if (d < bd || (d === bd && b.j === 0)) { bd = d; bi = i; } });
       if (bi >= 0) return { zone: 'tick', l, i: bi };
     }
     if (Math.abs(x - LX(l.end)) <= 5) return { zone: 'end', l };
@@ -44,8 +44,8 @@
       const row = Math.max(0, Math.min(5, Math.floor((y - top0()) / TRK)));
       if (row !== d.row0) l.row = row;
     } else if (d.zone === 'tick') {
-      const i = d.i, lo = i > 0 ? l.units[i - 1].s : 0, hi = i < l.units.length - 1 ? l.units[i + 1].s : l.end - 0.03;
-      l.units[i].s = Math.max(lo, Math.min(hi, snap(t))); delete l.units[i].e; if (i > 0) delete l.units[i - 1].e; K.fixLine(l);
+      const B = K.bounds(l), b = B[d.i], lo = d.i > 0 ? K.boundTime(l, B[d.i - 1]) : 0, hi = d.i < B.length - 1 ? K.boundTime(l, B[d.i + 1]) : l.end - 0.03;
+      K.setBoundary(l, b.i, b.j, Math.max(lo, Math.min(hi, snap(t))));
     } else if (d.zone === 'end') { l.end = Math.max(snap(t), l.units[l.units.length - 1].s + 0.05); K.fixLine(l); }
     else if (d.zone === 'show') l.showAt = K.r3(Math.min(snap(t), K.ls(l) - 0.05));
     else if (d.zone === 'hide') l.hideAt = K.r3(Math.max(snap(t), K.ls(l) + 0.1));
@@ -139,7 +139,8 @@
           const x = Math.round(LX(u.s)) + 0.5, nx = LX(K.unitEnd(l, i));
           g.beginPath(); g.moveTo(x, y + h * 0.5); g.lineTo(x, y + h); g.stroke();
           if (nx - x > 9 && u.t.trim()) g.fillText(u.t, x + 2, y + h * 0.28);
-          if (i === K.ui.tapIdx && K.ui.tapArmed) { g.fillStyle = '#ffd84d'; g.fillRect(x - 1, y + h - 4, Math.max(3, nx - x), 4); g.fillStyle = '#fff'; }
+          K.subTimes(l, i).slice(1, -1).forEach((tm) => { const xm = Math.round(LX(tm)) + 0.5; g.save(); g.strokeStyle = 'rgba(255,216,77,.8)'; g.beginPath(); g.moveTo(xm, y + h * 0.68); g.lineTo(xm, y + h); g.stroke(); g.restore(); });
+          if (K.ui.tapArmed && (K.bounds(l)[K.ui.tapIdx] || {}).i === i) { g.fillStyle = '#ffd84d'; g.fillRect(x - 1, y + h - 4, Math.max(3, nx - x), 4); g.fillStyle = '#fff'; }
         });
       } else { g.fillStyle = '#d5dae3'; g.font = '12px "Yu Gothic UI","Microsoft YaHei",sans-serif'; g.fillText(K.lineText(l), x1 + 4, y + h / 2); }
       g.restore(); g.font = '11px "Segoe UI",sans-serif';

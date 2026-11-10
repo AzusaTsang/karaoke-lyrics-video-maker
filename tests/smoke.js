@@ -20,6 +20,17 @@ window.addEventListener('load', async () => {
     out.retime = { unit: K.line(l.id).units[k].t, before, after: K.line(l.id).units[k].s, expect: T0 };
     out.mono = K.line(l.id).units.every((u, i, a) => !i || u.s >= a[i - 1].s);
     K.undo(); out.retimeUndo = K.line(l.id).units[k].s === before;
+    // 按假名（拍）拖：第 1 个字 王道{おうどう} 的第 3 拍
+    { const c = K.line(l.id), u0 = c.units[0], n = K.nMora(u0); K.seek(27.95); await wait(50);
+      const I3 = K.screen().info.get(c.id), G3 = K.geo(c, I3, cv.width, cv.height), e3 = G3.x0 + K.progressEdge(c, G3.L, 27.95) * G3.s;
+      const [ax, ay] = toClient(e3, G3.y - S.size * 0.4), [ax2] = toClient(G3.x0 + (G3.L.units[0].x + G3.L.units[0].w * 2 / n) * G3.s, 0);
+      ev(cv, 'pointerdown', ax, ay); ev(cv, 'pointermove', ax2, ay); ev(cv, 'pointerup', ax2, ay);
+      const r0 = K.line(l.id).units[0]; out.mora = { ruby: r0.r, n, m: r0.m, s: r0.s, expect3rd: 27.95 };
+      const L0 = K.line(l.id), Gm = K.geo(L0, I3, cv.width, cv.height); out.moraEdgeFrac = +(K.progressEdge(L0, Gm.L, 27.95) / Gm.L.units[0].w).toFixed(3);
+      K.undo(); K.seek(T0); await wait(50); }
+    // 长音：最后一个字应一直擦到行结束，中途是部分进度
+    { const c = K.line(l.id), li = c.units.length - 1, u = c.units[li], Lc = K.layout(c), mid = (u.s + c.end) / 2;
+      out.longNote = { hasE: c.units.some((x) => x.e != null), end: c.end, lastStart: u.s, fracAtMid: +((K.progressEdge(c, Lc, mid) - Lc.units[li].x) / Lc.units[li].w).toFixed(2) }; }
     // ---- B. 浏览模式 ----
     K.ui.tool = 'scrub'; const L2 = K.line(l.id); K.seek(T0); await wait(50);
     { const I2 = K.screen().info.get(L2.id), G2 = K.geo(L2, I2, cv.width, cv.height), e2 = G2.x0 + K.progressEdge(L2, G2.L, K.now()) * G2.s;

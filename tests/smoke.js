@@ -385,6 +385,237 @@ window.addEventListener('load', async () => {
       ok('iconButtonsNamed', !unnamed.length, unnamed);
       ok('ariaKeysExist', [...document.querySelectorAll('[data-i18n-aria]')].every((el) => K.has(el.dataset.i18nAria) && el.getAttribute('aria-label') === K.t(el.dataset.i18nAria))); }
 
+    // ---- S. 阶段 3：添加歌词 / LRC / SRT / ASS / 自动注音 / ZIP ----
+    { const plain = (x) => x.units.map((u) => u.t).join('');
+      /* S0. 启动时不碰网络：kuromoji 只在用户要求时才加载 */
+      ok('noKuromojiAtStartup', !window.kuromoji && K.furi.tokenizer === null && !document.querySelector('script[src*="jsdelivr"], script[src*="kuromoji"]') && !performance.getEntriesByType('resource').some((e) => /jsdelivr/.test(e.name)));
+
+      /* S1. 粘贴歌词：行数 / 分段 / 注音 / 均分时间 / 一步撤销 / 选中第一行 */
+      K.setProject(K.blank()); K.select(null); await frames(1);
+      const before = JSON.stringify(K.project);
+      const txt = '夜空に光る星{ほし}の\r\n約束{やくそく}を忘れない\n\n\n  second para line  \n\tlast\u0007';
+      const A = K.addLyrics(txt, { mode: 'replace', start: 10, dur: 3, gap: 4 });
+      out.paste = A && A.map((x) => [plain(x), x.newPara, K.ls(x), x.end]);
+      ok('pasteLineCount', A && A.length === 4 && K.project.lines.length === 4, out.paste);
+      ok('pasteParagraphFlags', A.map((x) => x.newPara).join() === ',,true,', A.map((x) => x.newPara));
+      ok('pasteFuriganaParsed', A[0].units.length === 7 && A[0].units[5].t === '星' && A[0].units[5].r === 'ほし' && A[1].units[0].t === '約束' && A[1].units[0].r === 'やくそく' && K.unitsToText(A[0].units) === '夜空に光る星{ほし}の');
+      ok('pasteTrimsAndSanitises', plain(A[2]) === 'second para line' && plain(A[3]) === 'last', [plain(A[2]), plain(A[3])]);
+      ok('pasteBackToBack', near(K.ls(A[0]), 10) && near(A[0].end, 13) && near(K.ls(A[1]), 13) && near(A[1].end, 16) && near(K.ls(A[2]), 20) && near(A[2].end, 23) && near(K.ls(A[3]), 23), out.paste);
+      ok('pasteEvenSplit', near(A[0].units[3].s, 10 + 3 * 3 / 7, 1e-3) && near(A[0].units[6].s, 10 + 6 * 3 / 7, 1e-3), A[0].units.map((u) => u.s));
+      ok('pasteEvenSplitSkipsSpaces', near(A[2].units[0].s, 20) && near(A[2].units[7].s, 20 + 6 * 3 / 14, 1e-2), A[2].units.map((u) => u.s));
+      ok('pasteSelectsFirst', K.ui.sel === A[0].id);
+      ok('pasteDurationCoversLines', K.project.duration >= 26 + 5 - 1e-6, K.project.duration);
+      ok('pasteSingleUndoStep', K.undoWhy() === 'paste' && (K.undo(), JSON.stringify(K.project) === before && !K.canUndo()));
+      K.redo(); ok('pasteRedo', K.project.lines.length === 4);
+      { const B = K.addLyrics('x\ny', { mode: 'append', start: 40, dur: 2, gap: 4, firstPara: true });
+        ok('pasteAppend', K.project.lines.length === 6 && B[0].newPara === true && near(K.ls(B[1]), 42), K.project.lines.length);
+        K.undo(); ok('pasteAppendUndoOneStep', K.project.lines.length === 4); }
+      ok('pasteEmptyIsNull', K.addLyrics(' \n\n\t\n', { mode: 'append', start: 0, dur: 3, gap: 4 }) === null && K.project.lines.length === 4);
+      { const X = K.addLyrics('<img src=x onerror="window.__pwn=2">', { mode: 'append', start: 50, dur: 3, gap: 4 }); await frames(3);
+        ok('pasteNoInjection', X.length === 1 && !document.querySelector('#list img, #tab-line img') && !window.__pwn, document.querySelectorAll('img').length); K.undo(); }
+      /* 对话框：从顶栏菜单进入，空内容不能提交，切换语言不丢文字，提交后一步撤销 */
+      K.setProject(K.blank()); await frames(1);
+      document.getElementById('bImport').click(); await frames(1);
+      { const mb = [...document.querySelectorAll('#menu button')];
+        ok('importMenuHasPaste', !document.getElementById('menu').hidden && mb.length === 2 && mb[0].textContent === K.t('imp.paste'), mb.map((b) => b.textContent));
+        mb[0].click(); await frames(1);
+        const dlg = document.querySelector('dialog.paste'), ta = dlg && dlg.querySelector('#plText');
+        ok('pasteDialogOpens', !!(dlg && dlg.open && ta) && dlg.contains(document.activeElement));
+        ok('pasteGoDisabledWhenEmpty', dlg.querySelector('.dacts .pri').disabled);
+        ta.value = 'あい\nう\n\nえ'; ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ok('pasteCounter', !dlg.querySelector('.dacts .pri').disabled && dlg.querySelector('#plCount').textContent === K.t('pl.count', { n: 3, p: 2, s: 13 }), dlg.querySelector('#plCount').textContent);
+        K.setLang('ja'); await frames(1);
+        ok('pasteDialogKeepsTextOnLang', dlg.querySelector('#plText').value === 'あい\nう\n\nえ' && dlg.querySelector('h2').textContent === K.t('pl.title') && !dlg.querySelector('.dacts .pri').disabled);
+        K.setLang('zh-CN'); await frames(1);
+        ok('pasteAfterOptionDisabledWhenEmpty', dlg.querySelector('#plStart option[value="after"]').disabled);
+        dlg.querySelector('.dacts .pri').click(); await frames(2);
+        ok('pasteDialogAdds', !document.querySelector('dialog.paste') && K.project.lines.length === 3 && K.project.lines[2].newPara === true && K.ui.sel === K.project.lines[0].id && K.undoWhy() === 'paste', K.project.lines.length);
+        ok('pasteToastTellsNextStep', [...document.querySelectorAll('#toasts .toast')].some((t) => t.textContent.includes(K.t('pl.done', { n: 3 }))));
+        K.undo(); ok('pasteDialogUndoOneStep', K.project.lines.length === 0 && !K.canUndo()); }
+      { const pa = K.welcomeActions.find((a) => a.id === 'paste');
+        ok('welcomeHasPaste', pa && pa.where.includes('welcome') && pa.where.includes('empty') && K.has(pa.label) && K.has(pa.desc));
+        await frames(2); const eb = document.querySelector('#empty [data-act="paste"]'); ok('emptyStateHasPaste', !!eb);
+        eb.click(); await frames(1); ok('emptyStatePasteOpensDialog', !!document.querySelector('dialog.paste'));
+        document.querySelector('dialog.paste').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await frames(1); ok('pasteEscCloses', !document.querySelector('dialog.paste') && !K.modalOpen()); }
+
+      /* S2. LRC 导入 */
+      { const P = (t) => K.normalizeProject(K.parseLrc(t));
+        const a = P('\uFEFF[ti:My Song]\r\n[ar:Someone]\r\n[offset:500]\r\n[00:10.00]First line\r\n[00:14.50]  Second\r\n[00:30.00]\r\n[00:40.00]Third\r\njunk line\r\n');
+        out.lrcA = a.lines.map((x) => [plain(x), K.ls(x), x.end]);
+        ok('lrcTitleAndLines', a.title === 'My Song' && a.lines.length === 3 && a.lines.map(plain).join('|') === 'First line|Second|Third', out.lrcA);
+        ok('lrcOffsetApplied', near(K.ls(a.lines[0]), 9.5, 1e-3) && near(K.ls(a.lines[1]), 14, 1e-3) && near(K.ls(a.lines[2]), 39.5, 1e-3), out.lrcA);
+        ok('lrcEndIsNextStart', near(a.lines[0].end, 14, 1e-3), a.lines[0].end);
+        ok('lrcEndCappedAt8s', near(a.lines[1].end, 22, 1e-3) && near(a.lines[2].end, 47.5, 1e-3), [a.lines[1].end, a.lines[2].end]);
+        ok('lrcPlainEvenSplit', near(a.lines[0].units[7].s, 9.5 + 4.5 * 6 / 9, 1e-2), a.lines[0].units.map((u) => u.s));
+        const b = P('[00:05.00][01:05.00]Repeat\n[00:10.00]Other\n[00:50.5]x\n[00:51.250]y');
+        out.lrcB = b.lines.map((x) => [plain(x), K.ls(x), x.end]);
+        ok('lrcMultiTimestamp', b.lines.map(plain).join() === 'Repeat,Other,x,y,Repeat' && near(K.ls(b.lines[4]), 65) && near(b.lines[0].end, 10) && near(b.lines[1].end, 18) && near(K.ls(b.lines[2]), 50.5) && near(K.ls(b.lines[3]), 51.25), out.lrcB);
+        const c = P('[00:20.00]<00:20.00>he<00:20.50>llo <00:21.00>world<00:22.00>\n[00:30.00][00:40.00]<00:30.00>a<00:31.00>b<00:32.00>');
+        const L = c.lines[0], u = L.units;
+        out.lrcC = c.lines.map((x) => [plain(x), x.units.map((q) => q.s), x.end]);
+        ok('lrcEnhancedUnits', plain(L) === 'hello world' && near(u[0].s, 20) && near(u[1].s, 20.25, 1e-3) && near(u[2].s, 20.5) && near(u[6].s, 21) && near(L.end, 22), out.lrcC);
+        ok('lrcEnhancedMultiStampShift', plain(c.lines[2]) === 'ab' && near(K.ls(c.lines[2]), 40) && near(c.lines[2].units[1].s, 41) && near(c.lines[2].end, 42) && near(c.lines[1].units[1].s, 31) && near(c.lines[1].end, 32), out.lrcC);
+        let thrown = false; try { K.parseLrc('hello\nworld'); } catch (e) { thrown = true; }
+        ok('lrcNoTimestampsThrows', thrown);
+        ok('lrcFuriganaSyntax', P('[00:01.00]星{ほし}の').lines[0].units[0].r === 'ほし');
+        // 通过“拖入文件”这条路径导入（和 SRT 同一套确认 / 排队逻辑）
+        const f = new File(['[ti:Dropped]\n[00:01.00]hello\n[00:03.00]world\n'], 'x.lrc', { type: '' }); const dt = new DataTransfer(); dt.items.add(f); K.dirty = false;
+        window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); await until(() => K.project.title === 'Dropped');
+        ok('lrcDropImports', K.project.title === 'Dropped' && K.project.lines.length === 2 && K.doc.src === 'import' && [...document.querySelectorAll('#toasts .toast')].some((t) => t.textContent.includes(K.t('msg.lrc'))), [K.project.title, K.project.lines.length, K.doc.src]); }
+
+      /* S3. 导出：LRC 往返 / SRT / ASS */
+      for (const si of [0, 1]) {
+        K.setProject(K.normalizeProject(K.SAMPLES[si].project)); const O = K.S().offset;
+        const src = K.project.lines.filter((x) => plain(x).trim()).sort((p, q) => K.ls(p) - K.ls(q));
+        const back = K.normalizeProject(K.parseLrc(K.exportLrcText(true))).lines; let worst = 0, bad = null;
+        if (back.length !== src.length) bad = 'count ' + back.length + '/' + src.length;
+        else src.forEach((x, i) => {
+          const sc = []; x.units.forEach((q) => Array.from(q.t).forEach((ch, ci) => sc.push([ch, ci ? null : Math.max(0, q.s + O)]))); const bc = back[i].units.map((q) => [q.t, q.s]);
+          const trim = (a) => { a = a.slice(); while (a.length && !a[0][0].trim()) a.shift(); while (a.length && !a[a.length - 1][0].trim()) a.pop(); return a; };
+          const A2 = trim(sc), B2 = trim(bc);
+          if (A2.map((q) => q[0]).join('') !== B2.map((q) => q[0]).join('')) { bad = bad || 'text ' + i + ' ' + JSON.stringify([A2.map((q) => q[0]).join(''), B2.map((q) => q[0]).join('')]); return; }
+          A2.forEach((q, k) => { if (q[1] != null) worst = Math.max(worst, Math.abs(q[1] - B2[k][1])); });
+          worst = Math.max(worst, Math.abs(Math.max(0, x.end + O) - back[i].end));
+        });
+        ok('lrcRoundTrip:' + si, !bad && worst <= 0.01, { bad, worst, lines: src.length });
+        // SRT：一行一条，起止 = 行的开始 / 结束；能被应用自己的 SRT 导入读回
+        const srt = K.exportSrtText(), cues = K.parseSrt(srt);
+        ok('srtShape:' + si, /^1\n\d\d:\d\d:\d\d,\d{3} --> \d\d:\d\d:\d\d,\d{3}\n.+/.test(srt) && cues.length === src.length && new RegExp('\\n\\n' + src.length + '\\n').test(srt), srt.slice(0, 120));
+        ok('srtTimes:' + si, cues.every((c, i) => Math.abs(c.start - (K.ls(src[i]) + O)) < 0.002 && Math.abs(c.end - (src[i].end + O)) < 0.002 && c.text === plain(src[i]).trim()), cues[0]);
+      }
+      { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); const S = K.S(); Object.assign(S, { baseFill: '#112233', highFill: '#ffd84d', baseStroke: '#445566', W: 1280, H: 720, font: "'Meiryo', 'Yu Gothic UI', sans-serif", weight: 'bold' });
+        ok('assColorConversion', K.assColor('#ffd84d') === '4DD8FF' && K.assColor('#112233') === '332211' && K.assColor('#ff0000') === '0000FF' && K.assColor('nonsense') === 'FFFFFF');
+        const ass = K.exportAssText(), ls = ass.split('\n'), sty = ls.find((x) => x.startsWith('Style: Default,')).split(',');
+        ok('assHeader', ls[0] === '[Script Info]' && ass.includes('[V4+ Styles]') && ass.includes('[Events]') && ass.includes('PlayResX: 1280') && ass.includes('PlayResY: 720'), ls.slice(0, 8));
+        ok('assStyle', sty[1] === 'Meiryo' && +sty[2] === S.size && sty[3] === '&H004DD8FF' && sty[4] === '&H00332211' && sty[5] === '&H00665544' && sty[7] === '-1', sty);
+        const src = K.screen().ord.filter((x) => plain(x).trim()), dl = ls.filter((x) => x.startsWith('Dialogue:'));
+        ok('assOneDialoguePerLine', dl.length === src.length && src.length > 10, [dl.length, src.length]);
+        let bad = null;
+        dl.forEach((d, i) => {
+          const f = d.split(','), text = f.slice(9).join(','), kf = [...text.matchAll(/\\kf(\d+)/g)].map((m) => +m[1]), l = src[i];
+          const sum = kf.reduce((a, b) => a + b, 0), want = (l.end - K.ls(l)) * 100;
+          if (!/^\d:\d\d:\d\d\.\d\d$/.test(f[1]) || !/^\d:\d\d:\d\d\.\d\d$/.test(f[2])) bad = bad || ['time', d.slice(0, 60)];
+          if (kf.length !== l.units.length || Math.abs(sum - want) > 1.01) bad = bad || ['kf', i, kf.length, l.units.length, sum, want];
+          if (text.replace(/\{[^}]*\}/g, '') !== plain(l)) bad = bad || ['text', i, text];
+        });
+        ok('assKaraokeDurations', !bad, bad);
+        ok('assDropsFurigana', !dl.join('\n').includes('おうどう') && src.some((x) => x.units.some((q) => q.r)));
+        K.setProject(K.normalizeProject(K.SAMPLES[0].project)); }
+
+      /* S4. 自动注音（分词器用桩，不联网） */
+      { const WORDS = { '受け入れ': [['受け入れ', 'ウケイレ']], 'お嬢さん': [['お嬢さん', 'オジョウサン']], '飲み干そう': [['飲み干そ', 'ノミホソ'], ['う', 'ウ']], 'ロシ': [['ロシ', undefined]], '死刑': [['死刑', 'シキョウ']], '判決': [['判決', 'ハンケツ']], '王道': [['王道', 'オウドウ']] };
+        const KEYS = Object.keys(WORDS).sort((a, b) => b.length - a.length);
+        const stub = { tokenize: (t) => { const o = []; let i = 0; while (i < t.length) { const k = KEYS.find((w) => t.startsWith(w, i)); if (k) { WORDS[k].forEach((x) => o.push({ surface_form: x[0], reading: x[1] })); i += k.length; } else { o.push({ surface_form: t[i], reading: undefined }); i++; } } return o; } };
+        const mk = (text, ts, end) => { const l = K.newLine({ units: K.parseText(text), end }); l.units.forEach((u, i) => (u.s = ts[i])); return l; };
+        const show = (l) => l.units.map((u) => u.t + (u.r ? '{' + u.r + '}' : '')).join('|');
+        const F = K.furi; F.tokenizer = stub;
+        // 词 → 单元：汉字块只拿自己的读音
+        const sp = (s, r) => F.tokenSpecs(s, r).specs.map((x) => x.t + (x.r ? '{' + x.r + '}' : '')).join('|');
+        ok('furiAnchorUkeire', sp('受け入れ', 'ウケイレ') === '受{う}|け|入{い}|れ', sp('受け入れ', 'ウケイレ'));
+        ok('furiAnchorOjousan', sp('お嬢さん', 'オジョウサン') === 'お|嬢{じょう}|さ|ん', sp('お嬢さん', 'オジョウサン'));
+        ok('furiAnchorNomihosou', sp('飲み干そ', 'ノミホソ') === '飲{の}|み|干{ほ}|そ', sp('飲み干そ', 'ノミホソ'));
+        ok('furiKatakanaWord', sp('ロシ', 'ロシ') === 'ロ|シ' && sp('ロシ', undefined) === 'ロ|シ');
+        ok('furiWholeKanjiWordKeepsOneUnit', sp('王道', 'オウドウ') === '王道{おうどう}' && sp('死刑', 'シケイ') === '死刑{しけい}');
+        ok('furiUnmatchableReadingSkipped', sp('受け入れ', 'アイウエオ') === '受|け|入|れ' && F.tokenSpecs('受け入れ', 'アイウエオ').miss === 1 && F.tokenSpecs('受け入れ', undefined).miss === 1);
+        ok('furiCatakanaToHiragana', sp('今日', 'キョウ') === '今日{きょう}' && sp('一ヶ月', 'イッカゲツ') === '一ヶ月{いっかげつ}');
+        // 整个项目：一步撤销
+        K.setProject(K.blank());
+        const lines = [mk('受け入れ', [1, 1.5, 2, 2.7], 3.5), mk('お嬢さん', [4, 4.2, 4.4, 4.6], 5), mk('飲み干そう', [6, 6.2, 6.4, 6.6, 6.8], 7.5), mk('ロシ', [8, 8.4], 9), mk('王道を', [10, 10.4, 10.8], 11.5)];
+        K.project.lines = lines; K.commit('edit'); const snapBefore = JSON.stringify(K.project);
+        const r = F.run('all', false);
+        out.furi = K.project.lines.map(show);
+        ok('furiRunAll', out.furi.join(' / ') === '受{う}|け|入{い}|れ / お|嬢{じょう}|さ|ん / 飲{の}|み|干{ほ}|そ|う / ロ|シ / 王道{おうどう}|を' && r.added === 6 && r.lines === 4 && r.kanji === 4, [out.furi, r]);
+        ok('furiTimingKept', K.project.lines[0].units.map((u) => u.s).join() === '1,1.5,2,2.7' && K.project.lines[0].end === 3.5 && K.project.lines[1].units.map((u) => u.s).join() === '4,4.2,4.4,4.6' && K.project.lines[2].units.map((u) => u.s).join() === '6,6.2,6.4,6.6,6.8');
+        ok('furiMergedUnitStartsAtFirstChar', K.project.lines[4].units[0].t === '王道' && K.project.lines[4].units[0].s === 10 && K.project.lines[4].units[1].s === 10.8 && K.project.lines[4].end === 11.5, K.project.lines[4].units);
+        ok('furiPureKatakanaLineUntouched', JSON.stringify(K.project.lines[3].units) === JSON.stringify(lines[3].units) && !K.project.lines[3].units.some((u) => u.r));
+        ok('furiRoundTripsThroughText', K.project.lines.every((x) => K.parseText(K.unitsToText(x.units)).map((u) => u.t + (u.r || '')).join() === x.units.map((u) => u.t + (u.r || '')).join()));
+        ok('furiAllLinesOneUndoStep', K.undoWhy() === 'furi' && (K.undo(), JSON.stringify(K.project) === snapBefore && K.undoWhy() === 'edit'));
+        // 已有注音保留（含逐拍时间），overwrite 时才替换
+        K.setProject(K.blank());
+        const ex = mk('死刑判決', [20, 21, 22], 23); ex.units = [{ t: '死刑', r: 'しけい', s: 20, m: [20.3, 20.6] }, { t: '判', r: null, s: 21 }, { t: '決', r: null, s: 22 }]; K.fixLine(ex);
+        K.project.lines = [ex]; K.commit('edit');
+        const r1 = F.run('all', false), u1 = K.project.lines[0].units;
+        ok('furiKeepsExistingReading', show(K.project.lines[0]) === '死刑{しけい}|判決{はんけつ}' && r1.added === 1 && r1.kept === 1 && u1[0].m && u1[0].m.join() === '20.3,20.6' && u1[0].s === 20 && u1[1].s === 21 && K.project.lines[0].end === 23, [show(K.project.lines[0]), r1, u1]);
+        K.undo(); const r2 = F.run('all', true);
+        ok('furiOverwriteReplaces', show(K.project.lines[0]) === '死刑{しきょう}|判決{はんけつ}' && r2.added === 2 && r2.kept === 0, [show(K.project.lines[0]), r2]);
+        K.undo();
+        // 选中的一行
+        K.project.lines = [mk('受け入れ', [1, 2, 3, 4], 5), mk('お嬢さん', [6, 7, 8, 9], 10)]; K.commit('edit'); K.select(K.project.lines[1].id);
+        const r3 = F.run('line', false);
+        ok('furiSelectedLineOnly', show(K.project.lines[0]) === '受|け|入|れ' && show(K.project.lines[1]) === 'お|嬢{じょう}|さ|ん' && r3.total === 1, [show(K.project.lines[0]), show(K.project.lines[1])]);
+        // 分词结果对不上原文时不动这一行
+        F.tokenizer = { tokenize: () => [{ surface_form: 'xx', reading: 'ヤ' }] };
+        ok('furiMismatchedTokensIgnored', F.plan('受け入れ') === null);
+        F.tokenizer = null;
+        // 应用内流程：没有分词器时先解释要下载什么（不联网、不加载脚本），取消后什么都不发生
+        K.setProject(K.normalizeProject({ lines: [{ start: 1, end: 3, text: '受け入れ' }, { start: 4, end: 6, text: 'お嬢さん' }] })); K.select(K.project.lines[0].id); await frames(1);
+        let pr = K.autoFurigana('line'); await frames(1);
+        let fd = document.querySelector('dialog.furi');
+        ok('furiAskDialogExplainsDownload', !!(fd && fd.open) && fd.querySelector('.callout') && /jsdelivr/i.test(fd.querySelector('.callout').textContent) && /18/.test(fd.querySelector('.callout').textContent) && fd.querySelector('input[value="line"]').checked, fd && fd.textContent.slice(0, 200));
+        fd.querySelector('.dacts button').click(); await pr; await frames(1);
+        ok('furiCancelDoesNotLoad', !document.querySelector('dialog') && !document.querySelector('script[src*="jsdelivr"]') && !window.kuromoji && F.tokenizer === null && !F.busy && !K.undoWhy());
+        // 分词器已就绪：不再提示下载，点“添加注音”一步完成，提示里有数量和“请检查”
+        F.tokenizer = stub; K.select(null); pr = K.autoFurigana('line'); await frames(1); fd = document.querySelector('dialog.furi');
+        ok('furiReadyDialogNoDownloadNote', !!fd && !fd.querySelector('.callout') && fd.querySelector('input[value="line"]').disabled && fd.querySelector('input[value="all"]').checked);
+        fd.querySelector('.dacts .pri').click(); await pr; await frames(2);
+        ok('furiDialogAppliesAll', K.project.lines.map(show).join(' / ') === '受{う}|け|入{い}|れ / お|嬢{じょう}|さ|ん' && K.undoWhy() === 'furi', K.project.lines.map(show));
+        ok('furiResultToastAsksToProofread', [...document.querySelectorAll('#toasts .toast')].some((t) => t.textContent.includes(K.t('furi.done', { n: 3, lines: 2 }))));
+        F.tokenizer = null; }
+
+      /* S5. ZIP 写入器 */
+      { ok('crc32Known', K.crc32('123456789') === 0xCBF43926 && K.crc32('The quick brown fox jumps over the lazy dog') === 0x414FA339 && K.crc32('') === 0 && K.crc32(new Uint8Array([0, 0, 0, 0])) === 0x2144DF1C, K.crc32('123456789').toString(16));
+        ok('crc32Chunked', K.crc32('456789', K.crc32('123')) === 0xCBF43926);
+        const parseZip = async (blob) => {
+          const buf = new Uint8Array(await blob.arrayBuffer()), dv = new DataView(buf.buffer), e = buf.length - 22, res = { ok: true, entries: [], err: null }, dec = new TextDecoder();
+          if (dv.getUint32(e, true) !== 0x06054b50) return { ok: false, err: 'no EOCD' };
+          const n = dv.getUint16(e + 10, true), cdSize = dv.getUint32(e + 12, true), cdOff = dv.getUint32(e + 16, true); let p = cdOff;
+          if (dv.getUint16(e + 8, true) !== n || cdOff + cdSize !== e) return { ok: false, err: 'bad EOCD' };
+          for (let i = 0; i < n; i++) {
+            if (dv.getUint32(p, true) !== 0x02014b50) return { ok: false, err: 'bad central record ' + i };
+            const crc = dv.getUint32(p + 16, true), cs = dv.getUint32(p + 20, true), us = dv.getUint32(p + 24, true), nl = dv.getUint16(p + 28, true), lo = dv.getUint32(p + 42, true), method = dv.getUint16(p + 10, true);
+            const name = dec.decode(buf.subarray(p + 46, p + 46 + nl));
+            if (dv.getUint32(lo, true) !== 0x04034b50) return { ok: false, err: 'bad local header ' + name };
+            const lnl = dv.getUint16(lo + 26, true), lxl = dv.getUint16(lo + 28, true), data = buf.subarray(lo + 30 + lnl + lxl, lo + 30 + lnl + lxl + us);
+            res.entries.push({ name, crc, size: us, stored: method === 0 && cs === us, crcOk: K.crc32(data) === crc && dv.getUint32(lo + 14, true) === crc, nameOk: dec.decode(buf.subarray(lo + 30, lo + 30 + lnl)) === name, data });
+            p += 46 + nl + dv.getUint16(p + 30, true) + dv.getUint16(p + 32, true);
+          }
+          res.consumed = p === e; return res;
+        };
+        const zw = new K.ZipWriter(); await zw.add('a.txt', 'hello'); await zw.add('dir/b.bin', new Uint8Array([0, 1, 2, 255])); await zw.add('é.txt', new Blob(['blob data é']));
+        const Z = await parseZip(zw.finish()), dec = new TextDecoder();
+        out.zip3 = Z.entries && Z.entries.map((x) => [x.name, x.size, x.crc.toString(16)]);
+        ok('zipCentralDirectory', Z.ok && Z.consumed && Z.entries.length === 3 && Z.entries.map((x) => x.name).join() === 'a.txt,dir/b.bin,é.txt', Z);
+        ok('zipSizesCrcsAndData', Z.entries.every((x) => x.stored && x.crcOk && x.nameOk) && Z.entries[0].size === 5 && dec.decode(Z.entries[0].data) === 'hello' && Z.entries[1].data.join() === '0,1,2,255' && dec.decode(Z.entries[2].data) === 'blob data é' && Z.entries[0].crc === K.crc32('hello'), out.zip3);
+        // 分卷
+        const saved = [], sink = K.zipSink({ total: 5, per: 2, base: 't', save: (b, nm) => saved.push([nm, b]) });
+        for (let i = 0; i < 5; i++) await sink.put('f' + i + '.png', new Blob([new Uint8Array(10 + i)]));
+        await sink.end(); const parts = await Promise.all(saved.map((x) => parseZip(x[1])));
+        ok('zipSplitsIntoParts', saved.map((x) => x[0]).join() === 't_part01.zip,t_part02.zip,t_part03.zip' && sink.files() === 3 && parts.map((p) => p.entries.length).join() === '2,2,1' && parts.every((p) => p.ok && p.entries.every((x) => x.crcOk)), saved.map((x) => x[0]));
+        ok('zipFrameNumbersContinueAcrossParts', parts.flatMap((p) => p.entries.map((x) => x.name)).join() === 'f0.png,f1.png,f2.png,f3.png,f4.png');
+        const one = [], s1 = K.zipSink({ total: 3, per: 2000, base: 'one', save: (b, nm) => one.push(nm) }); await s1.put('x', new Blob(['x'])); await s1.end(); ok('zipSingleNoSuffix', one.join() === 'one.zip');
+        // 重复使用同一个 Blob（空白帧）：CRC 只算一次、内容各自完整
+        const bl = new Blob([new Uint8Array(1000).fill(7)]), zb = new K.ZipWriter(); await zb.add('1', bl); await zb.add('2', bl); const ZB = await parseZip(zb.finish());
+        ok('zipReusedBlankBlob', ZB.ok && ZB.entries.length === 2 && ZB.entries[0].crc === ZB.entries[1].crc && ZB.entries.every((x) => x.crcOk && x.size === 1000));
+        /* 端到端：点“下载为 ZIP…”，得到合法的 ZIP，里面是真正的 PNG */
+        K.setProject(K.normalizeProject(K.SAMPLES[0].project)); await K.ensureFont(); K.S().fps = 24; document.getElementById('s_fps').value = '24';
+        document.getElementById('eStart').value = '28'; document.getElementById('eEnd').value = '28.2'; document.getElementById('eEnd').dispatchEvent(new Event('input', { bubbles: true }));
+        const g2 = document.createElement('canvas'); g2.width = K.S().W; g2.height = K.S().H; const est = await K.estimateSequence(g2.getContext('2d'), 'none', 28, 5, 24);
+        ok('zipEstimate', est.drew && est.sample > 1000 && est.lyric >= 1 && est.lyric <= 5 && est.bytes >= est.sample && K.countLyricFrames(0, 10, 24) === 0, est);
+        const od = K.download, dl = []; K.download = (b, nm) => dl.push([nm, b]);
+        const zb2 = document.getElementById('bZip'); ok('zipButtonPresent', !!zb2 && !zb2.hidden && !!document.getElementById('bPng'));
+        // 估计太大时先在应用内问一声；取消就什么都不下载
+        const w0 = K.ZIP_WARN; K.ZIP_WARN = 1; zb2.click(); await until(() => document.querySelector('dialog.small'), 100);
+        const bd = document.querySelector('dialog.small'); ok('zipBigWarning', !!bd && bd.textContent.includes(K.t('zip.bigTitle')) && /MB|GB/.test(bd.textContent), bd && bd.textContent);
+        bd.querySelector('.dacts button').click(); await frames(3); ok('zipBigCancelDownloadsNothing', !dl.length && !document.getElementById('bZip').disabled); K.ZIP_WARN = w0;
+        zb2.click(); await until(() => dl.length && !zb2.disabled, 300);
+        const ZE = dl.length ? await parseZip(dl[0][1]) : null; K.download = od;
+        out.zipE2E = ZE && { name: dl[0][0], n: ZE.entries.length, first: ZE.entries[0].name, bytes: ZE.entries.map((x) => x.size) };
+        ok('zipExportFileName', dl.length === 1 && dl[0][0] === 'lyrics_png.zip', dl.map((x) => x[0]));
+        ok('zipExportContents', ZE && ZE.ok && ZE.entries.length === 5 && ZE.entries.map((x) => x.name).join() === 'lyrics_000001.png,lyrics_000002.png,lyrics_000003.png,lyrics_000004.png,lyrics_000005.png' && ZE.entries.every((x) => x.crcOk && x.stored && x.data[0] === 0x89 && x.data[1] === 0x50 && x.data[2] === 0x4e && x.data[3] === 0x47), out.zipE2E);
+        ok('zipExportMessage', document.getElementById('expMsg').textContent === K.t('exp.doneZip', { n: 5, w: K.S().W, h: K.S().H, fps: 24, t0: 28, z: 1 }), document.getElementById('expMsg').textContent); }
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false;
+    }
+
     // ---- H. 拖入多个文件：全部处理（工程在前，媒体在后） ----
     { const mk = (title) => new File([JSON.stringify({ title, lines: [{ start: 1, end: 2, text: title }] })], title + '.kara.json', { type: 'application/json' });
       const dt = new DataTransfer(); dt.items.add(mk('DropA')); dt.items.add(mk('DropB'));

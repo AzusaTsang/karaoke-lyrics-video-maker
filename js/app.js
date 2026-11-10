@@ -88,7 +88,7 @@
 
   /* ---------- 工程文件 ---------- */
   let fileHandle = null;
-  const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
+  const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 40000); };
   K.download = download;
   const projBlob = () => new Blob([JSON.stringify(K.project, null, 1)], { type: 'application/json' });
   const TYPES = () => [{ description: T('projType'), accept: { 'application/json': ['.kara.json', '.json'] } }];
@@ -112,6 +112,7 @@
       const [a, c] = L[k].split('-->'); return { start: ts(a), end: ts(c), text: L.slice(k + 1).join(' ').trim() };
     }).filter((c) => c && c.text);
   }
+  K.parseSrt = parseSrt;
   const isMedia = (f) => /\.(mp3|wav|m4a|aac|flac|ogg|opus|mp4|mov|mkv|webm)$/i.test(f.name) || /^(audio|video)\//.test(f.type);
   /* 换工程：旧工程有未保存修改时先确认；新工程来源记在 K.doc 里 */
   const replaceProject = async (p, doc, what) => {
@@ -122,14 +123,15 @@
   async function openFile(f, handle) {
     const name = f.name.toLowerCase();
     if (isMedia(f)) return loadMedia(f);
-    let p, srt = name.endsWith('.srt');
+    let p, srt = name.endsWith('.srt'), lrc = name.endsWith('.lrc');
     try {
       const txt = await f.text();
       if (srt) { p = K.normalizeProject({ lines: parseSrt(txt) }); p.settings = K.cleanSettings(K.S()); p.title = f.name.replace(/\.srt$/i, ''); }
+      else if (lrc) { p = K.normalizeProject(K.parseLrc(txt)); p.settings = K.cleanSettings(K.S()); if (isUntitled(p.title)) p.title = f.name.replace(/\.lrc$/i, ''); }
       else { p = K.normalizeProject(JSON.parse(txt)); if (isUntitled(p.title)) p.title = f.name.replace(/(\.kara)?\.json$/i, ''); }
     } catch (e) { K.toast(T('msg.readFail', { msg: e.message }), 'error'); return; }
-    const isProj = !srt && name.endsWith('.json');
-    if (await replaceProject(p, { src: isProj ? 'file' : 'import', name: isProj ? f.name : '', handle: isProj && handle ? handle : null }, 'open') && srt) K.toast(T('msg.srt'));
+    const isProj = !srt && !lrc && name.endsWith('.json');
+    if (await replaceProject(p, { src: isProj ? 'file' : 'import', name: isProj ? f.name : '', handle: isProj && handle ? handle : null }, 'open') && (srt || lrc)) K.toast(T(srt ? 'msg.srt' : 'msg.lrc'));
   }
   /* 打开 / 拖入的文件排队逐个处理，两次拖放不会交错 */
   let q = Promise.resolve();
@@ -168,27 +170,36 @@
   /* ---------- 导出 ---------- */
   let cancel = false;
   const expBg = () => ($('eBg').value === 'color' ? 'color' : 'none');
-  async function exportPng() {
-    if (!window.showDirectoryPicker) { K.toast(T('exp.needChrome'), 'error'); return; }
-    let dir; try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) { return; }
+  /* zip = true：不用文件夹，打成 ZIP 下载（太多帧时分成多个 ZIP，见 zip.js） */
+  async function exportPng(zip) {
+    let dir = null;
+    if (!zip) {
+      if (!window.showDirectoryPicker) { K.toast(T('exp.needChrome'), 'error'); return; }
+      try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) { return; }
+    }
     await K.ensureFont();
     const S = K.S(), fps = +S.fps, t0 = parseFloat($('eStart').value) || 0, t1 = parseFloat($('eEnd').value) || K.dur();
     const n = Math.max(1, Math.round((t1 - t0) * fps)), bg = expBg();
     const c = document.createElement('canvas'); c.width = S.W; c.height = S.H; const g = c.getContext('2d');
     const toBlob = () => new Promise((r) => c.toBlob(r, 'image/png'));
-    let blank = null; cancel = false; $('bCancel').hidden = false; $('bPng').disabled = true; const st = performance.now();
+    let sink = { put: async (name, blob) => { const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(blob); await w.close(); }, end: async () => {}, files: () => 0 };
+    if (zip) {
+      const est = await K.estimateSequence(g, bg, t0, n, fps), per = Math.max(50, Math.min(K.ZIP_PER, Math.floor(3e9 / Math.max(est.sample, 1))));
+      if (est.bytes > K.ZIP_WARN && !(await K.zipConfirm(est, Math.ceil(n / per)))) return;
+      sink = K.zipSink({ total: n, per, base: 'lyrics_png', save: (b, name) => K.download(b, name) });
+    }
+    let blank = null; cancel = false; $('bCancel').hidden = false; $('bPng').disabled = $('bZip').disabled = true; const st = performance.now();
     try {
       for (let f = 0; f < n; f++) {
-        if (cancel) { $('expMsg').textContent = T('exp.cancelled', { n: f }); break; }
+        if (cancel) { await sink.end(); $('expMsg').textContent = T(zip ? 'exp.cancelledZip' : 'exp.cancelled', { n: f }); break; }
         const drew = K.render(g, t0 + f / fps, { bg });
         const blob = drew ? await toBlob() : blank || (blank = await toBlob());
-        const w = await (await dir.getFileHandle(`lyrics_${String(f + 1).padStart(6, '0')}.png`, { create: true })).createWritable();
-        await w.write(blob); await w.close();
+        await sink.put(`lyrics_${String(f + 1).padStart(6, '0')}.png`, blob);
         if (f % 10 === 0) { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); await new Promise((r) => setTimeout(r)); }
       }
-      if (!cancel) { $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T('exp.done', { n, w: S.W, h: S.H, fps, t0 }); }
+      if (!cancel) { await sink.end(); $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
     } catch (e) { $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
-    $('bCancel').hidden = true; $('bPng').disabled = false;
+    $('bCancel').hidden = true; $('bPng').disabled = $('bZip').disabled = false;
   }
   function exportFrame() {
     const S = K.S(), c = document.createElement('canvas'); c.width = S.W; c.height = S.H;
@@ -261,7 +272,7 @@
     $('bOpen').onclick = () => openDialog();
     $('bSave').onclick = save; $('bSaveAs').onclick = saveAs;
     $('saveState').onclick = save;
-    $('bImport').onclick = () => openDialog('.srt,.json');
+    $('bImport').onclick = () => K.importMenu($('bImport'));
     $('bMedia').onclick = K.pickMedia; $('mbLoad').onclick = K.pickMedia;
     $('mbClose').onclick = () => { bannerOff = true; mediaUi(); };
     $('bHelp').onclick = $('keys').onclick = () => K.showHelp();
@@ -281,7 +292,9 @@
     setTool(K.pref('tool'));
     $('bRec').onclick = () => { document.body.classList.add('rec'); document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
     document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('rec'); });
-    $('bPng').onclick = exportPng; $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
+    $('bPng').onclick = () => exportPng(false); $('bZip').onclick = () => exportPng(true); $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
+    if (!window.showDirectoryPicker) { $('bPng').hidden = true; $('bZip').classList.add('pri'); $('bPng').classList.remove('pri'); }      // 没有文件夹 API：ZIP 就是主要方式
+    K.bindLyricExport();
 
     /* 拖入文件：DataTransfer 在第一次 await 之后就被清空，所以先同步取出所有文件 / 句柄，再排队逐个处理（工程在前、媒体在后） */
     let dragN = 0; const dz = $('dropzone'), hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');

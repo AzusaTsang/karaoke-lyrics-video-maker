@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.." || exit 1
 CH="${CHROME:-/c/Program Files/Google/Chrome/Application/chrome.exe}"
 sed 's#</body>#<script src="tests/smoke.js"></script></body>#' index.html > _test.html
 DOM="$("$CH" --headless=new --disable-gpu --allow-file-access-from-files --autoplay-policy=no-user-gesture-required \
-  --window-size=1720,1000 --virtual-time-budget=20000 \
+  --window-size=1720,1000 --virtual-time-budget=${BUDGET:-300000} \
   --dump-dom "file:///$(pwd -W 2>/dev/null || pwd)/_test.html" 2>/dev/null)"
 rm -f _test.html
 RES="$(printf '%s' "$DOM" | sed -n '/<pre id="result">/,/<\/pre>/p' | sed -e 's#.*<pre id="result">##' -e 's#</pre>.*##' \

@@ -32,6 +32,8 @@
       [T('menu.merge'), () => K.ops.merge(l)],
       [T('menu.resetShow'), () => { l.showAt = null; l.hideAt = null; K.commit('showHide'); }],
       null,
+      [T('menu.furiLine'), () => K.autoFurigana('line')], [T('menu.furiAll'), () => K.autoFurigana('all')],
+      null,
       [T('menu.del'), () => K.ops.del(l)],
     ].filter((v, i, a) => !(v === null && a[i - 1] === null)));
   };
@@ -64,6 +66,7 @@
       <h4>${et('line.gText')}</h4>
       <label class="blk" for="lnText">${et('line.text')}</label>
       <textarea id="lnText" data-k="text" rows="2" spellcheck="false">${esc(K.unitsToText(l.units))}</textarea>
+      <div class="btns"><button data-a="furi" title="${et('line.furiTip')}">${et('line.furi')}</button></div>
       <h4>${et('line.gTiming')}</h4>
       <div class="row"><label>${et('line.startEnd')}</label><input data-k="start" type="number" step="0.01" value="${K.ls(l).toFixed(2)}" aria-label="${et('line.start')}"><input data-k="end" type="number" step="0.01" value="${l.end.toFixed(2)}" aria-label="${et('line.end')}"></div>
       <div class="btns ind"><button data-a="m50" title="${et('line.nudgeTip')}">−50ms</button><button data-a="p50" title="${et('line.nudgeTip')}">+50ms</button><button data-a="even" title="${et('line.evenTip')}">${et('line.even')}</button></div>
@@ -105,7 +108,7 @@
       const t = K.now() - K.S().offset;
       if (d.n != null) { K.ui.tapIdx = +d.n; K.ops.tap(K.r3(t)); return; }
       ({ m50: () => K.ops.shift(l, -0.05), p50: () => K.ops.shift(l, 0.05), even: () => K.ops.even(l), dup: () => K.ops.dup(l), split: () => K.ops.split(l, t), merge: () => K.ops.merge(l), del: () => K.ops.del(l),
-        autoShow: () => K.ops.set(l, 'showAt', null), autoHide: () => K.ops.set(l, 'hideAt', null) }[d.a] || (() => {}))();
+        autoShow: () => K.ops.set(l, 'showAt', null), autoHide: () => K.ops.set(l, 'hideAt', null), furi: () => K.autoFurigana('line') }[d.a] || (() => {}))();
     });
   }
 

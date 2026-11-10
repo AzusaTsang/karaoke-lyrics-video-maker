@@ -93,7 +93,7 @@
      run 在对话框关闭之后调用。改完数组后调用 K.renderEmpty() 刷新空状态。 */
   K.welcomeActions = [
     { id: 'sample', label: 'w.sample', desc: 'w.sampleDesc', pri: true, where: ['welcome', 'empty'], run: () => K.trySample() },
-    { id: 'import', label: 'w.import', desc: 'w.importDesc', where: ['welcome', 'empty'], run: () => K.openDialog('.srt,.json') },
+    { id: 'import', label: 'w.import', desc: 'w.importDesc', where: ['welcome', 'empty'], run: () => K.openDialog(K.IMPORT_ACCEPT) },
     { id: 'open', label: 'w.open', desc: 'w.openDesc', where: ['welcome', 'empty'], run: () => K.openDialog() },
     { id: 'empty', label: 'w.empty', desc: 'w.emptyDesc', where: ['welcome'], run: () => K.newProject() },
   ];

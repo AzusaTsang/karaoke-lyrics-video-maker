@@ -165,6 +165,17 @@ h2.sub{font-size:14px;margin:10px 0 2px;color:var(--acc)}
 table.keys td{vertical-align:top;padding:3px 4px}
 table.keys td.k{width:40%;font-family:inherit;font-size:12px;color:#cfd5de}
 table.keys tr td:first-child{font-family:inherit;font-size:12px}
+.dlg.paste{width:min(680px,calc(100vw - 24px))}
+.dlg.paste textarea{min-height:190px;font-size:15px;line-height:1.6;margin-top:2px}
+.opts{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);gap:8px 10px;align-items:center;margin:10px 0 4px}
+.opts label{color:var(--mut);font-size:12px;line-height:1.25}
+.opts select,.opts input{min-width:0;width:100%}
+@media (max-width:560px){.opts{grid-template-columns:auto minmax(0,1fr)}}
+.chk{display:flex;gap:8px;align-items:center;margin:6px 0;cursor:pointer}
+.chk input{margin:0;flex:none}
+.callout{border:1px solid #6b5222;background:#2a2418;color:#ffe3b0;border-radius:8px;padding:8px 10px}
+.dlg.furi{width:min(520px,calc(100vw - 24px))}
+progress{width:100%;height:8px;accent-color:var(--acc)}
 .about{border-top:1px solid var(--line);margin-top:10px}
 .about p{margin:4px 0 8px}
 

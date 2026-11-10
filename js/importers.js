@@ -147,14 +147,17 @@
     const off = K.S().offset, head = []; const ti = (K.project.title || '').replace(/[\r\n\]]/g, ' ').trim();
     if (ti) head.push('[ti:' + ti + ']');
     head.push('[re:Karaoke Lyrics Studio]', '[ve:' + K.APP.version + ']');
+    /* LRC 没有“一行里换行”：行内换行变成一个空格（旁边已经有空白时不加），在增强 LRC 里这个空格跟着换行前的那一组 */
+    const ut = (l, i) => { const nx = l.units[i + 1]; return l.units[i].t + (nx && nx.n && !/\s$/.test(l.units[i].t) && !/^\s/.test(nx.t) ? ' ' : ''); };
     const body = byStart().filter((l) => plain(l).trim()).map((l) => '[' + lrcT(K.ls(l) + off) + ']' +
-      (words ? K.groups(l).map((g) => '<' + lrcT(l.units[g.i].s + off) + '>' + l.units.slice(g.i, g.e).map((u) => u.t).join('')).join('') + '<' + lrcT(l.end + off) + '>' : plain(l)));
+      (words ? K.groups(l).map((g) => '<' + lrcT(l.units[g.i].s + off) + '>' + l.units.slice(g.i, g.e).map((u, k) => ut(l, g.i + k)).join('')).join('') + '<' + lrcT(l.end + off) + '>' : K.lineJoin(l, ' ', true)));
     return head.concat(body).join('\n') + '\n';
   };
   const srtT = (t) => { const ms = Math.max(0, Math.round(t * 1000)); return pad(Math.floor(ms / 3600000)) + ':' + pad(Math.floor(ms / 60000) % 60) + ':' + pad(Math.floor(ms / 1000) % 60) + ',' + pad(ms % 1000, 3); };
   K.exportSrtText = () => {
     const off = K.S().offset;
-    return byStart().filter((l) => plain(l).trim()).map((l, i) => (i + 1) + '\n' + srtT(K.ls(l) + off) + ' --> ' + srtT(l.end + off) + '\n' + plain(l).trim()).join('\n\n') + '\n';
+    /* 行内换行 = 字幕里真正的换行（导入时多行的字幕又变回一行带换行的歌词） */
+    return byStart().filter((l) => plain(l).trim()).map((l, i) => (i + 1) + '\n' + srtT(K.ls(l) + off) + ' --> ' + srtT(l.end + off) + '\n' + K.lineJoin(l, '\n').split('\n').map((s) => s.trim()).join('\n').trim()).join('\n\n') + '\n';
   };
   /* "#rrggbb" → ASS 的 BBGGRR（样式行里写 &H00BBGGRR，行内标签里写 &HBBGGRR&） */
   K.assColor = (hex) => { const h = /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : 'ffffff'; return (h.slice(4, 6) + h.slice(2, 4) + h.slice(0, 2)).toUpperCase(); };
@@ -168,13 +171,29 @@
       // 卡拉OK：SecondaryColour = 还没唱到的颜色，PrimaryColour = 擦过之后的颜色
       ['Style: Default', fam, S.size, c('highFill'), c('baseFill'), c('baseStroke'), '&H00000000', S.weight === 'normal' ? 0 : -1, 0, 0, 0, 100, 100, S.spacing, 0, 1, S.strokeW, 0, 2, mx, mx, Math.max(0, Math.round(S.H * (1 - S.posY))), 1].join(','), '',
       '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'];
+    /* 行属性（局部样式）：和全局不同的字体 / 字号 / 颜色 / 描边写成行内标签；位置偏移折算进这一条的边距（近似） */
+    const famOf = (f) => ((f.match(/^\s*(?:'([^']+)'|"([^"]+)"|([^,]+))/) || []).slice(1).find(Boolean) || 'Arial').trim().replace(/[,\r\n\\{}]/g, ' ');
+    const ovTags = (E) => {
+      if (E === S) return '';
+      let t = '';
+      if (E.font !== S.font) t += '\\fn' + famOf(E.font);
+      if (E.size !== S.size) t += '\\fs' + E.size;
+      if (E.weight !== S.weight) t += '\\b' + (E.weight === 'normal' ? 0 : 1);
+      if (E.highFill !== S.highFill) t += '\\1c&H' + K.assColor(E.highFill) + '&';
+      if (E.baseFill !== S.baseFill) t += '\\2c&H' + K.assColor(E.baseFill) + '&';
+      if (E.baseStroke !== S.baseStroke) t += '\\3c&H' + K.assColor(E.baseStroke) + '&';
+      if (E.strokeW !== S.strokeW) t += '\\bord' + E.strokeW;
+      if (E.spacing !== S.spacing) t += '\\fsp' + E.spacing;
+      return t;
+    };
     const ev = sc.ord.filter((l) => plain(l).trim()).map((l) => {
-      const I = sc.info.get(l.id), show = Math.round((I.show + off) * 100), a = Math.round((K.ls(l) + off) * 100);
+      const I = sc.info.get(l.id), E = K.LS(l), show = Math.round((I.show + off) * 100), a = Math.round((K.ls(l) + off) * 100);
       const end = Math.max(Math.round((I.hide + S.fadeOut + off) * 100), Math.round((l.end + off) * 100));
-      let prev = a, txt = '{\\an' + (I.align === 'left' ? 1 : I.align === 'right' ? 3 : 2) + '\\fad(' + Math.round(S.fadeIn * 1000) + ',' + Math.round(S.fadeOut * 1000) + ')}' + (a > show ? '{\\k' + (a - show) + '}' : '');
-      l.units.forEach((u, i) => { const nx = Math.round((K.unitEnd(l, i) + off) * 100); txt += '{\\kf' + Math.max(0, nx - prev) + '}' + assEsc(u.t); prev = Math.max(prev, nx); });
-      const mv = Math.max(0, Math.round(S.H - (S.posY * S.H + I.row * K.rowStep()) - S.size * 0.22));
-      return ['Dialogue: 0', assT(Math.min(show, a) / 100), assT(end / 100), 'Default', '', mx, mx, mv, '', txt].join(',');
+      let prev = a, txt = '{\\an' + (I.align === 'left' ? 1 : I.align === 'right' ? 3 : 2) + '\\fad(' + Math.round(S.fadeIn * 1000) + ',' + Math.round(S.fadeOut * 1000) + ')' + ovTags(E) + '}' + (a > show ? '{\\k' + (a - show) + '}' : '');
+      /* 行内换行 = ASS 的 \N（空白在换行两边不占位置，照样带上它们的 \kf，时间不丢） */
+      l.units.forEach((u, i) => { const nx = Math.round((K.unitEnd(l, i) + off) * 100); txt += (u.n && i ? '\\N' : '') + '{\\kf' + Math.max(0, nx - prev) + '}' + assEsc(u.t); prev = Math.max(prev, nx); });
+      const ox = Math.round((E.dx || 0) * S.W), mv = Math.max(0, Math.round(S.H - (S.posY * S.H + I.row * K.rowStep()) - S.size * 0.22 - (E.dy || 0) * S.H));
+      return ['Dialogue: 0', assT(Math.min(show, a) / 100), assT(end / 100), 'Default', '', Math.max(0, mx + ox), Math.max(0, mx - ox), mv, '', txt].join(',');
     });
     return head.concat(ev).join('\n') + '\n';
   };

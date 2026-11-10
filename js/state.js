@@ -9,7 +9,7 @@
     rubyFill: '#ffffff', rubyStroke: '#1b3a8a', rubyHighFill: '#ffd84d', rubyHighStroke: '#a14a00',
     strokeW: 8, rubyStrokeW: 4, glow: 0, glowColor: '#4aa3ff',
     W: 1920, H: 1080, posY: 0.7, maxW: 0.92, layout: 'duet', marginX: 0.06, rows: 2, preShow: 6,
-    dots: true, paraGap: 4, dotsDur: 3, dotSize: 0.36,
+    dots: true, paraGap: 4, dotsDur: 3, dotSize: 0.36, dotFill: '', dotHighFill: '', wrapGap: 0.3,
     lead: 0.6, hold: 0.5, fadeIn: 0.2, fadeOut: 0.25, offset: 0,
     bgMode: 'transparent', bgColor: '#101820', keyColor: '#00ff00', useVideoBg: false, fps: 60,
   };
@@ -18,16 +18,19 @@
   K.RANGE = {
     size: [4, 1000], rubyRatio: [0, 2], rubyGap: [-500, 500], spacing: [-200, 500], lineGap: [-1, 5],
     strokeW: [0, 200], rubyStrokeW: [0, 200], glow: [0, 500], W: [16, 7680, 1], H: [16, 7680, 1], posY: [-1, 2], maxW: [0.05, 1],
-    marginX: [0, 0.5], preShow: [0, 60], paraGap: [0, 120], dotsDur: [0, 30], dotSize: [0.01, 3],
+    marginX: [0, 0.5], preShow: [0, 60], paraGap: [0, 120], dotsDur: [0, 30], dotSize: [0.01, 3], wrapGap: [-0.5, 5],
     lead: [0, 30], hold: [0, 30], fadeIn: [0, 10], fadeOut: [0, 10], offset: [-60, 60],
   };
   K.ENUM = { weight: ['normal', 'bold', '900'], layout: ['duet', 'stack'], bgMode: ['transparent', 'color'], rows: [1, 2, 3], fps: [24, 25, 30, 50, 60] };
   const COLOR_RE = /^#[0-9a-f]{6}$/i;
+  /* 可以留空的颜色（'' = 跟随歌词颜色）：预备点的未唱 / 正在倒数颜色 */
+  const OPT_COLOR = new Set(['dotFill', 'dotHighFill']);
   /* 返回清洗后的值；不合法时返回 undefined（调用方回退默认值） */
   K.cleanSetting = (k, v) => {
     const d = K.DEF[k];
     if (d === undefined) return undefined;
     if (K.ENUM[k]) { const e = K.ENUM[k].find((x) => String(x) === String(v)); return e; }
+    if (OPT_COLOR.has(k)) return v === '' ? '' : typeof v === 'string' && COLOR_RE.test(v) ? v.toLowerCase() : undefined;
     if (typeof d === 'boolean') return typeof v === 'string' ? v === 'true' || v === '1' : !!v;
     if (typeof d === 'number') {
       v = typeof v === 'string' && v.trim() !== '' ? +v : v;
@@ -43,6 +46,41 @@
     const S = Object.assign({}, K.DEF);
     if (src && typeof src === 'object') Object.keys(K.DEF).forEach((k) => { if (Object.prototype.hasOwnProperty.call(src, k)) { const v = K.cleanSetting(k, src[k]); if (v !== undefined) S[k] = v; } });
     return S;
+  };
+  /* ---------- 行的局部属性：l.o = { 键: 值 }，没写的键 = 用全局设置 ----------
+     LSTYLE：可以按行覆盖的全局设置（字体 / 字号 / 颜色 / 描边 / 注音 / 最大宽度 / 行内换行间距 / 预备点）；
+     LPOS：只属于行的位置属性：dx / dy = 位置偏移（画布宽 / 高的比例，换画布尺寸也不走样），grow = 换行后的多行往哪边长 */
+  K.LSTYLE = ['font', 'weight', 'size', 'spacing', 'maxW', 'wrapGap', 'strokeW', 'glow', 'glowColor', 'baseFill', 'highFill', 'baseStroke', 'highStroke',
+    'rubyRatio', 'rubyGap', 'rubyFill', 'rubyHighFill', 'rubyStroke', 'rubyHighStroke', 'rubyStrokeW', 'dotsDur', 'dotSize', 'dotFill', 'dotHighFill'];
+  K.LPOS = ['dx', 'dy', 'grow'];
+  K.LKEYS = K.LSTYLE.concat(K.LPOS);
+  K.LDEF = { dx: 0, dy: 0, grow: 'auto' };
+  K.GROW = ['auto', 'up', 'down', 'center'];
+  /* 清洗一个行属性；undefined = 不合法或等于“不覆盖”（dx / dy 为 0、grow 为 auto） */
+  K.cleanLineSetting = (k, v) => {
+    if (k === 'dx' || k === 'dy') { v = typeof v === 'string' && v.trim() !== '' ? +v : v; return typeof v === 'number' && isFinite(v) && v !== 0 ? Math.max(-1, Math.min(1, v)) : undefined; }
+    if (k === 'grow') return K.GROW.includes(v) && v !== 'auto' ? v : undefined;
+    return K.LSTYLE.includes(k) ? K.cleanSetting(k, v) : undefined;
+  };
+  /* 清洗整个覆盖对象：未知键、不合法的值丢掉，键按 LKEYS 的顺序（读写往返一致）；什么都不剩返回 null */
+  K.cleanOverrides = (src) => {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+    const o = {};
+    K.LKEYS.forEach((k) => { if (Object.prototype.hasOwnProperty.call(src, k)) { const v = K.cleanLineSetting(k, src[k]); if (v !== undefined) o[k] = v; } });
+    return Object.keys(o).length ? o : null;
+  };
+  /* 设 / 清（v == null）一个行属性；空了就把 l.o 整个删掉。不 commit */
+  K.setOv = (l, k, v) => {
+    const o = Object.assign({}, l.o); if (v == null) delete o[k]; else o[k] = v;
+    const c = K.cleanOverrides(o); if (c) l.o = c; else delete l.o;
+  };
+  K.hasOv = (l) => !!(l && l.o && Object.keys(l.o).length);
+  /* 一行的有效设置：没有覆盖时就是全局设置对象本身（和以前完全一样）；有覆盖时按 K.rev 缓存合并结果（含 LDEF） */
+  const lsCache = new WeakMap();
+  K.LS = (l) => {
+    if (!K.hasOv(l)) return K.S();
+    const c = lsCache.get(l); if (c && c.rev === K.rev && c.S === K.project.settings && c.o === l.o) return c.E;
+    const E = Object.assign({}, K.LDEF, K.S(), l.o); lsCache.set(l, { rev: K.rev, S: K.project.settings, o: l.o, E }); return E;
   };
   /* HTML 转义：所有拼进 innerHTML 的值（包括属性值）都要过一遍 */
   K.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -94,11 +132,11 @@
   const ALPHA = new RegExp(`^[${AL}][${AL}\\p{M}]*$`, 'u'), MARK = /^\p{M}+$/u, JOIN = /^['’‐‑-]$/, HYPH = /^[‐‑-]$/;
   const isA = (u) => !!u && !u.r && ALPHA.test(u.t), isM = (u) => !!u && !u.r && MARK.test(u.t), isJ = (u) => !!u && !u.r && JOIN.test(u.t);
   K.isLetter = isA;
-  /* i 开始的词的结尾（不含尾随空格标点）；i 不是词的开头返回 0 */
+  /* i 开始的词的结尾（不含尾随空格标点）；i 不是词的开头返回 0。行内换行（u.n）处词一定断开 = 强制新音节 */
   const wordEnd = (U, i) => {
     if (!isA(U[i])) return 0;
     let j = i + 1;
-    for (;;) { if (isA(U[j]) || isM(U[j])) j++; else if (isJ(U[j]) && isA(U[j + 1])) j += 2; else return j; }
+    for (;;) { if (U[j] && U[j].n) return j; if (isA(U[j]) || isM(U[j])) j++; else if (isJ(U[j]) && isA(U[j + 1]) && !U[j + 1].n) j += 2; else return j; }
   };
   const VOW = 'aeiouyæœøɑəɛɔɪʊаеёиоуыэюяіїєαεηιουω';
   const ONSET = new Set('bl br cl cr dr fl fr gl gr kl kr pl pr tr vr ch ph th sh gh gn qu wh kh zh бр бл вр гр гл др кр кл пр пл тр фр фл хр хл πρ τρ κρ γρ βρ δρ φρ θρ χρ πλ κλ γλ βλ φλ χλ'.split(' '));
@@ -153,7 +191,7 @@
     while (i < n) {
       const w = wordEnd(U, i);
       if (!w) { G.push({ i, c: i + 1, e: i + 1, w: 0, f: 0 }); i++; continue; }
-      let e = w; while (e < n && !U[e].r && !sounding(U[e])) e++;
+      let e = w; while (e < n && !U[e].n && !U[e].r && !sounding(U[e])) e++;          // 尾随空格标点不越过换行
       const st = sylStarts(U, i, w, raw);
       st.forEach((s, x) => { const nx = st[x + 1]; G.push({ i: s, c: nx || w, e: nx || e, w: 1, f: x ? 0 : 1 }); });
       i = e;
@@ -269,6 +307,13 @@
     return JSON.stringify(U) !== before;
   };
   K.lineText = (l) => l.units.map((u) => u.t).join('');
+  /* 带行内换行的纯文本：换行处插入 sep；soft = 换行旁边已经有空白时不再插（LRC 用空格代替换行） */
+  K.lineJoin = (l, sep, soft) => l.units.map((u, i) => {
+    if (!u.n || !i) return u.t;
+    return soft && (/\s$/.test(l.units[i - 1].t) || /^\s/.test(u.t)) ? u.t : sep + u.t;
+  }).join('');
+  K.lineLabel = (l) => K.lineJoin(l, ' ⏎ ');                     // 列表 / 时间线上显示的文字：换行标成 ⏎
+  K.nRows = (l) => 1 + l.units.filter((u, i) => i && u.n).length;
   K.r3 = (x) => Math.round(x * 1000) / 1000;
   K.line = (id) => K.project.lines.find((l) => l.id === id) || null;
   K.sel = () => (K.ui.sel ? K.line(K.ui.sel) : null);
@@ -283,6 +328,14 @@
     });
     const last = l.units[l.units.length - 1];
     l.end = K.r3(Math.max(l.end, last ? last.s + 0.05 : l.end));
+    /* u.n（行内换行：这个单元开始新的一排）：第一个单元上没有意义；换行两边那一排都要有看得见的字，否则去掉 */
+    const vis = (u) => !!(u.r || u.t.trim()), cand = [];
+    l.units.forEach((u, i) => { if (!('n' in u)) return; const v = u.n; delete u.n; if ((v === 1 || v === true) && i > 0) cand.push(i); });
+    let ks = 0;
+    cand.forEach((i, x) => {
+      const nx = x + 1 < cand.length ? cand[x + 1] : l.units.length;
+      if (l.units.slice(ks, i).some(vis) && l.units.slice(i, nx).some(vis)) { l.units[i].n = 1; ks = i; }
+    });
     /* u.k（手动音节：1 = 这里开始新音节，0 = 这里不分）只对词里第 2 个起的字母有意义；放在最后一个键，读写往返时键顺序一致 */
     const U = l.units, inWord = new Set();
     for (let i = 0; i < U.length;) { const w = wordEnd(U, i); if (!w) { i++; continue; } for (let x = i + 1; x < w; x++) if (isA(U[x])) inWord.add(x); i = w; }
@@ -296,20 +349,24 @@
   };
   K.newLine = (o) => Object.assign({ id: K.newId(), units: [], end: 0, row: null, align: null, newPara: null, dots: null, showAt: null, hideAt: null }, o);
 
-  /* ---------- 文本 <-> 单元（注音语法：漢字{かんじ}；音节分隔：两个字母之间的 | ，如 Fon|taine，不显示） ---------- */
+  /* ---------- 文本 <-> 单元（注音语法：漢字{かんじ}；音节分隔：两个字母之间的 | ，如 Fon|taine，不显示；
+     行内换行：真正的换行，或者写成两个字符 \n。换行记在下一排第一个单元上：u.n = 1） ---------- */
   const RUBY_RE = /([々〆ヶ一-鿿]+)\{([^{}]*)\}|([\s\S])/gu, ALPHA1 = new RegExp(`^[${AL}]`, 'u');
   K.parseText = (str) => {
-    const out = []; let m, brk = false; RUBY_RE.lastIndex = 0;
+    const out = []; let m, brk = false, nl = false; RUBY_RE.lastIndex = 0; str = String(str == null ? '' : str);
+    const push = (u) => { if (nl && out.length) u.n = 1; nl = false; out.push(u); };
     while ((m = RUBY_RE.exec(str))) {
-      if (m[1]) { out.push({ t: m[1], r: m[2] || null }); brk = false; continue; }
-      if (m[3] === '\n' || m[3] === '\r') continue;
+      if (m[1]) { push({ t: m[1], r: m[2] || null }); brk = false; continue; }
+      const c = m[3];
+      if (c === '\n' || (c === '\\' && str[RUBY_RE.lastIndex] === 'n')) { if (c === '\\') RUBY_RE.lastIndex++; nl = true; brk = false; continue; }
+      if (c === '\r') continue;
       const pv = out[out.length - 1];
-      if (m[3] === '|' && (isA(pv) || isJ(pv) || isM(pv)) && ALPHA1.test(str.slice(RUBY_RE.lastIndex, RUBY_RE.lastIndex + 2))) { brk = true; continue; }
-      const u = { t: m[3], r: null }; if (brk) u.k = 1; brk = false; out.push(u);
+      if (c === '|' && (isA(pv) || isJ(pv) || isM(pv)) && ALPHA1.test(str.slice(RUBY_RE.lastIndex, RUBY_RE.lastIndex + 2))) { brk = true; continue; }
+      const u = { t: c, r: null }; if (brk) u.k = 1; brk = false; push(u);
     }
     return out;
   };
-  K.unitsToText = (units) => units.map((u) => (u.k === 1 ? '|' : '') + u.t + (u.r ? '{' + u.r + '}' : '')).join('');
+  K.unitsToText = (units) => units.map((u, i) => (u.n && i ? '\n' : '') + (u.k === 1 ? '|' : '') + u.t + (u.r ? '{' + u.r + '}' : '')).join('');
   /* 把一行的时间在 [s,e] 内按“有发音的字”平均分配 */
   K.evenSplit = (l, s, e) => {
     s = s == null ? K.ls(l) : s; e = e == null ? l.end : e;
@@ -378,15 +435,18 @@
           n.s = num(u.t0, fb);
           n._t1 = num(u.t1, n.s);
         }
+        if (u.n === 1 || u.n === true) n.n = 1;                                        // 行内换行（位置由 fixLine 再校验）
         if (u.k === 0 || u.k === 1 || typeof u.k === 'boolean') n.k = +u.k;        // 手动音节（位置由 fixLine 再校验）
         l.units.push(n); prev = n;
       });
-      const text = str(c.text, 2000), fromText = !l.units.length && !!text;
+      /* text（SRT / 粘贴的歌词）里的换行 = 行内换行，所以这里保留 \n，其余控制字符去掉 */
+      const text = typeof c.text === 'string' ? c.text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').slice(0, 2000) : str(c.text, 2000), fromText = !l.units.length && !!text;
       if (fromText) { l.units = K.parseText(text); l.units.forEach((u) => (u.s = start)); K.evenSplit(l, start, cend > start ? cend : start + 3); }
       const last = l.units[l.units.length - 1];
       if (!fromText) l.end = last && last._t1 != null ? Math.max(last._t1 + 0.08, cend) : cend;   // 对齐数据用最后一个字的结束；工程文件用自带的 end；SRT 用 evenSplit 的结束
       l.units.forEach((u) => delete u._t1);
       if (!l.units.length) return;
+      const o = K.cleanOverrides(c.o); if (o) l.o = o;                              // 行的局部属性：和全局设置同一套校验
       K.fixLine(l); p.lines.push(l); maxEnd = Math.max(maxEnd, l.end);
     });
     const dur = num(j.duration, 0);

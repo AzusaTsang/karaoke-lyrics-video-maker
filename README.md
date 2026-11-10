@@ -21,6 +21,8 @@ No installation and no build step: open `index.html` in Chrome or Edge, or host 
 - Latin, Cyrillic and Greek lyrics are timed by syllable (split automatically, correctable per line); letters inside a syllable follow it proportionally
 - Multi-row layout: lines take turns on alternating row slots, plus harmony rows that sing at the same time
 - Automatic paragraphs and a three-dot count-in before each paragraph
+- Line breaks inside a lyric line (`Shift+Enter` or `\n`): the rows form one block with one count-in, and the wipe continues from row to row
+- Per-line style: each line can have its own position offset, font, size, colors, furigana and count-in settings (*This line's own style*); move a line by `Alt`+dragging it in the preview
 - Timeline editor: move lines, retime single characters or syllables, set when a line appears and disappears
 - Draggable wipe cursor in the preview: pause, then drag it to where the singer actually is
 - Tap-to-time with `T` while the media plays
@@ -56,12 +58,15 @@ Press `?` or `F1` (or the **?** button) in the app for the same tables. The keyb
 | Preview | Click lyrics | Select that line |
 | Preview | Drag the **wipe cursor** (vertical bar with a dot), tool *Drag: Retime* | Pause at a moment, drag the cursor to the character being sung right now: the nearest character or syllable (or kana beat) starts at the current time. Boundaries that get pushed along are marked orange while you drag; letters inside a syllable follow proportionally |
 | Preview | Drag the wipe cursor, tool *Drag: Scrub* | Moves the playback position back and forth along this line |
+| Preview | `Alt`+drag lyrics | Move that line on screen (its position offset in *This line's own style*). It snaps to its original place and to the center lines of the picture; hold `Shift` as well to move freely |
 | Preview | Double-click lyrics | Jump to the start of that line |
+| Preview | Right-click lyrics | Same menu as on the timeline (including *Reset position* when the line has been moved) |
 | Timeline | Click / drag the ruler | Seek |
 | Timeline | Drag the solid part of a block | Move the whole line; drag it up or down to another track to change its row |
 | Timeline | Drag a small tick in the lower half of the selected block | Adjust the start of one character or syllable (yellow ticks: one kana beat). Right-click a syllable tick to split or merge syllables |
 | Timeline | Drag the right edge of the solid block | Adjust the line's end time |
 | Timeline | Drag the left / right thin edge of the pale window | When the line appears / disappears (orange = set by hand) |
+| Timeline | Drag the left end of the selected line's count-in dots | This line's own count-in length (orange = set); its appear time moves earlier automatically. Double-click to reset it to automatic |
 | Timeline | Double-click a block / a thin edge | Jump to the line start / reset the appear or disappear time to automatic |
 | Timeline | Right-click a block or empty space | Paragraph break, count-in dots, row, harmony line, split, merge, *Even out letters within syllables*, delete / add line |
 | Timeline | Wheel / `Ctrl`+wheel | Scroll / zoom |
@@ -95,6 +100,7 @@ While you drag on the timeline or in the preview, a small tooltip shows the valu
 | `M` | Merge with the next line |
 | `1`-`4` / `0` | Row 1-4 / automatic |
 | `Delete` | Delete the line |
+| `Ctrl`+`←` `→` `↑` `↓` | Move the selected line on screen by 4 px (`Ctrl+Shift`: 20 px) |
 | `F` / `Shift+F` | Zoom the timeline to the selected line / to the whole song |
 | `=` `-` | Zoom the timeline in / out |
 | `?` / `F1` | Help |
@@ -113,6 +119,7 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 *Add lyrics…* in the top bar → *Paste or type lyrics…* (the welcome guide's *Paste lyrics* and the same button on the empty-project screen open it too) opens the *Add lyrics* dialog:
 
 - Paste your lyrics into the large text box, **one line per row; a blank line starts a new paragraph** (the next line gets *Break here*). After a kanji word you can write `漢字{かんじ}` to add furigana. Below the box you see the number of lines, paragraphs and the approximate length.
+- Inside a row, the two characters `\n` become a line break inside that lyric line (see *Line breaks inside a line* below).
 - *Add*: *after the existing lyrics*, or *replace all lyrics (undoable)*.
 - *Start at*: *the playhead*, *0:00*, or *after the last line* (only when adding after the existing lyrics).
 - *Seconds per line* (default 3): the lines are laid out back to back and each line's characters are spread evenly over its time, like *Even split*. *Gap at paragraphs (s)* (default 4) is extra time left at blank lines, which leaves room for the count-in dots.
@@ -121,8 +128,10 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 ## Display rules
 
 - **Paragraphs.** A gap of at least the *Auto break gap* (Layout tab) since the previous lyric starts a new paragraph; you can also force a break with *Start a new paragraph here* in the right-click menu. Within a paragraph, lines take turns on the row slots, and the next line appears once its slot is free. **Paragraphs never pre-show each other**: the next paragraph's lyrics do not appear before the last line of the previous one has been sung, and the new paragraph starts with count-in dots.
-- **Count-in dots.** Three dots count down before the first line of each paragraph. Each line can be forced on or off.
+- **Count-in dots.** Three dots count down before the first line of each paragraph. Each line can be forced on or off. To give one line a longer or shorter count-in, select it and drag the left end of its dots on the timeline (or change *Countdown (s)* under *Count-in* in *This line's own style*); its appear time moves earlier automatically, as far as *Max pre-show (s)* and the end of the previous paragraph allow. The dots use the lyric fill colors unless you set *Dot colors (waiting / counting)* (Layout tab, or per line); ↺ next to the global setting makes them follow the lyric colors again.
 - **Harmony / simultaneous rows.** *Duplicate as harmony line* places the copy on a free row slot (for example row 3), and every row wipes on its own timing at the same time. Row slot, alignment, and appear / disappear times can all be overridden per line.
+- **Line breaks inside a line.** In the lyric field of the *Line* tab, `Shift+Enter` (the field is multi-line, so a plain `Enter` inserts a break too) or the two characters `\n` split a lyric line into several rows that form one block: they appear and disappear together, the count-in dots stand before the first row, and the wipe continues from the end of one row to the start of the next. Each row is aligned like the line, furigana sits above each row, and when the widest row is wider than *Max width* the whole block is scaled down. Rows are *Spacing of wrapped rows* apart (Layout tab, also per line); when a later row carries furigana, the furigana height is added so it does not touch the row above. Lines on a row slot in the upper half (or when there is only one slot) grow upward, so their last row sits on the slot's baseline; lines on the other slots grow downward. *Wrapped rows grow* in *This line's own style* overrides this (upward / downward / centered on the baseline). Overlaps with other slots are not resolved automatically: move the line with its position offset. A break never falls inside a syllable (a break in the middle of a word starts a new syllable), whitespace next to a break takes no room, and breaks are shown as ⏎ in the lyrics list and on the timeline. Splitting a line exactly at a break drops the break; merging never adds one.
+- **This line's own style.** The collapsible *This line's own style* group in the *Line* tab overrides settings for the selected line only: *Position* (*Offset → (× width)* and *Offset ↓ (× height)*, stored as fractions of the canvas so they survive a change of canvas size, and *Wrapped rows grow*), *Text* (font, weight, size, letter spacing, max width, spacing of wrapped rows, outline width, glow), *Colors*, *Furigana* and *Count-in*. A field you have not changed shows the global value; a changed field is marked orange and its ↺ button goes back to the global setting. *Copy style* / *Paste style*, *Apply to paragraph* and *Apply to all lines* copy the style, but not the position, to other lines; *Reset this line to the global style* removes everything the line sets for itself. Each of these is one undo step. Lines with their own style are marked **Aa** in the lyrics list. The group opens by itself for such lines; when you open or close it by hand, that choice is remembered. *Duplicate as harmony line* and splitting copy a line's own style; merging keeps the first line's.
 - **Furigana.** Write readings in the lyric text as `漢字{かんじ}`. When you edit the text, characters before and after the change keep their timing.
 - **Auto furigana.** Use *Furigana…* in the header of the lyrics list, *Auto furigana…* in the *Line* tab, or *Auto furigana (this line)…* / *Auto furigana (all lines)…* in the right-click menu. The dialog lets you pick *Only the selected line* or *All lyrics*, and whether to *Also replace existing furigana* (off by default: readings you already wrote and all timing stay). A run of kanji becomes one unit carrying its hiragana reading; for words that mix kanji and kana such as 受け入れ the reading is split by anchoring on the kana, so each kanji block gets only its own reading (受{う}け入{い}れ). The whole operation is one undo step and a message tells you how many readings were added. **Automatic readings are often wrong in lyrics** (names, archaic or special readings such as 征く, wrong word splits): proofread every line.
 - **Timing by kana beat.** A character with furigana is split into the beats of its reading (small kana join the previous beat). The cursor, the yellow ticks on the timeline, tap-to-time and the table on the right can all adjust each beat; beats you have not touched are spread evenly inside the character.
@@ -138,9 +147,9 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 
 **Lyrics files.** The *Lyrics files* section of the *Export* tab. Times include the Layout tab's *Global offset*.
 
-- *LRC (per character / syllable)*: enhanced LRC with a `<mm:ss.xx>` tag before every character (before every syllable in Latin, Cyrillic and Greek text; when imported, letters without their own tag are spread evenly between the tags), `[mm:ss.xx]` at the start of the line and a closing tag for the line's end. *LRC (per line)*: plain LRC with one timestamp per line.
-- *SRT*: one cue per lyric line, from the line start to its end.
-- *ASS karaoke*: one Dialogue per line with a `\kf<centiseconds>` wipe tag per character. The header has `[Script Info]` and `[V4+ Styles]`; the play resolution is the canvas size, the font is the first family name, and colors are converted to `&HBBGGRR` (unsung / swept = the two lyric fill colors, outline = the unsung outline color). On-screen position is approximated from row and alignment.
+- *LRC (per character / syllable)*: enhanced LRC with a `<mm:ss.xx>` tag before every character (before every syllable in Latin, Cyrillic and Greek text; when imported, letters without their own tag are spread evenly between the tags), `[mm:ss.xx]` at the start of the line and a closing tag for the line's end. *LRC (per line)*: plain LRC with one timestamp per line. LRC has no multi-row lines, so a line break inside a line becomes a space.
+- *SRT*: one cue per lyric line, from the line start to its end. A line break inside a line becomes a line break inside the cue, and importing an SRT turns a multi-line cue into one lyric line with breaks.
+- *ASS karaoke*: one Dialogue per line with a `\kf<centiseconds>` wipe tag per character. The header has `[Script Info]` and `[V4+ Styles]`; the play resolution is the canvas size, the font is the first family name, and colors are converted to `&HBBGGRR` (unsung / swept = the two lyric fill colors, outline = the unsung outline color). On-screen position is approximated from row and alignment. Line breaks become `\N`; a line's own font, size, weight, colors, outline width and letter spacing are written as inline tags, and its position offset is folded into the margins (approximate; the growth direction of wrapped rows is not reproduced).
 - Furigana cannot be represented in these formats and is left out; the ASS look is approximate, so check it in your player.
 
 **Premiere Pro.** File → Import, select the first image, and tick **Image Sequence**. If you exported from 0 s, place the clip at 0 s on the timeline and it lines up with the audio.

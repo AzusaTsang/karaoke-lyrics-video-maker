@@ -28,13 +28,18 @@
       const B = K.bounds(l); B.forEach((b, i) => { const d = Math.abs(LX(K.boundTime(l, b)) - x); if (d < bd || (d === bd && b.j === 0)) { bd = d; bi = i; } });
       if (bi >= 0) return { zone: 'tick', l, i: bi };
     }
+    /* 选中行的预备点起点（三个点左边）：拖动 = 这一行自己的预备点时长。和出现边重合时，靠近哪个算哪个（同样近时中间一带算预备点） */
+    if (l.id === K.ui.sel && I.dotsDur) {
+      const xd = LX(K.ls(l) - I.dotsDur), dd = Math.abs(x - xd), ds = Math.abs(x - LX(I.show));
+      if (dd <= 5 && (dd < ds || (dd === ds && yIn > TRK * 0.3 && yIn < TRK * 0.7))) return { zone: 'dots', l };
+    }
     if (Math.abs(x - LX(l.end)) <= 5) return { zone: 'end', l };
     if (Math.abs(x - LX(I.show)) <= 5) return { zone: 'show', l };
     if (Math.abs(x - LX(I.hide)) <= 5) return { zone: 'hide', l };
     if (t >= K.ls(l) && t <= l.end) return { zone: 'move', l };
     return { zone: 'window', l };
   }
-  const CUR = { ruler: 'text', tick: 'col-resize', end: 'ew-resize', show: 'w-resize', hide: 'e-resize', move: 'grab', window: 'pointer', empty: 'default', gutter: 'default' };
+  const CUR = { ruler: 'text', tick: 'col-resize', end: 'ew-resize', show: 'w-resize', hide: 'e-resize', dots: 'ew-resize', move: 'grab', window: 'pointer', empty: 'default', gutter: 'default' };
   /* 靠近播放头（6px 内）吸附；按住 Shift 不吸附 */
   let snapped = false;
   const snap = (t, e) => { if (!e.shiftKey && Math.abs(LX(t) - X(K.now())) < 6) { snapped = true; return K.now() - off(); } return t; };
@@ -47,6 +52,7 @@
     if (z === 'end') return K.t('tip.end', { t: f3(l.end) });
     if (z === 'show') return K.t('tip.show', { t: f3(I.show) }) + (l.showAt == null ? ' · ' + K.t('tip.auto') : '');
     if (z === 'hide') return K.t('tip.hide', { t: f3(I.hide) }) + (l.hideAt == null ? ' · ' + K.t('tip.auto') : '');
+    if (z === 'dots') return K.t('tip.dots', { d: f3(I.dotsDur), t: f3(K.ls(l) - I.dotsDur) }) + (l.o && l.o.dotsDur != null ? '' : ' · ' + K.t('tip.auto'));
     return '';
   };
 
@@ -56,7 +62,7 @@
       const h = hit(x, y), key = h.l ? h.zone + ':' + h.l.id + ':' + (h.i == null ? '' : h.i) : '';
       cv.style.cursor = CUR[h.zone];
       if (key !== (hov && hov.key)) hov = key ? { key, zone: h.zone, id: h.l.id, i: h.i } : null;
-      if (h.l && /^(tick|end|show|hide)$/.test(h.zone)) K.tip(e.clientX, e.clientY, tipText(h.zone, h.l, h.i)); else K.tipHide();
+      if (h.l && /^(tick|end|show|hide|dots)$/.test(h.zone)) K.tip(e.clientX, e.clientY, tipText(h.zone, h.l, h.i)); else K.tipHide();
       return;
     }
     const d = drag, l = d.l;
@@ -81,10 +87,20 @@
     } else if (d.zone === 'end') K.setEnd(l, Math.max(snap(t, e), K.minEnd(l)));
     else if (d.zone === 'show') l.showAt = K.r3(Math.min(snap(t, e), K.ls(l) - 0.05));
     else if (d.zone === 'hide') l.hideAt = K.r3(Math.max(snap(t, e), K.ls(l) + 0.1));
+    else if (d.zone === 'dots') {
+      /* 预备点时长 = 行首 − 鼠标位置，夹在 [0.6 秒, 上限] 里；出现时间是自动的话会像全局时长那样跟着提前，
+         但被上一段 / 手动出现时间挡住时，存下来的值也收到实际能显示的长度 */
+      if (!d.o0) delete l.o;
+      const want = K.r3(Math.max(DOTS_MIN, Math.min(K.RANGE.dotsDur[1], K.ls(l) - snap(t, e))));
+      K.setOv(l, 'dotsDur', want); K.touch();
+      const got = K.screen().info.get(l.id).dotsDur;
+      if (got >= DOTS_MIN && got < want - 1e-3) K.setOv(l, 'dotsDur', K.r3(got));
+    }
     K.touch();
     K.tip(e.clientX, e.clientY, tipText(d.zone, l, d.i) + (snapped ? '\n' + K.t('tip.snapped') : ''));
   }
-  const WHY = { move: 'shift', tick: 'timing', end: 'timing', show: 'showHide', hide: 'showHide' };
+  const WHY = { move: 'shift', tick: 'timing', end: 'timing', show: 'showHide', hide: 'showHide', dots: 'lineStyle' };
+  const DOTS_MIN = 0.6;                      // 比这短的预备点不显示（screen 里的规则），拖到这里为止
   K.initTimeline = () => {
     cv = document.getElementById('tlc'); g = cv.getContext('2d');
     ov = document.getElementById('tlov'); og = ov.getContext('2d');
@@ -97,7 +113,7 @@
       if (h.zone === 'ruler') { drag = { zone: 'ruler' }; tl.scrubbing = true; K.seek(Math.max(0, T(x))); return; }
       K.select(h.l.id);
       if (h.zone === 'window') return;
-      drag = { zone: h.zone, l: h.l, i: h.i, x0: x, y0: y, moved: false, orig: JSON.stringify(h.l), row0: K.screen().info.get(h.l.id).row };
+      drag = { zone: h.zone, l: h.l, i: h.i, x0: x, y0: y, moved: false, orig: JSON.stringify(h.l), o0: !!h.l.o, row0: K.screen().info.get(h.l.id).row };
       if (h.zone === 'move') cv.style.cursor = 'grabbing';
     });
     cv.addEventListener('pointermove', onMove);
@@ -114,6 +130,7 @@
       const r = cv.getBoundingClientRect(), h = hit(e.clientX - r.left, e.clientY - r.top);
       if (h.zone === 'show') K.ops.set(h.l, 'showAt', null);
       else if (h.zone === 'hide') K.ops.set(h.l, 'hideAt', null);
+      else if (h.zone === 'dots') { if (h.l.o && h.l.o.dotsDur != null) { K.setOv(h.l, 'dotsDur', null); K.commit('lineStyle'); } }
       else if (h.l) K.seek(Math.max(0, K.ls(h.l) + off() - 0.5));
     });
     cv.addEventListener('contextmenu', (e) => {
@@ -197,7 +214,11 @@
       g.fillStyle = l.hideAt != null ? '#ffb74d' : sel || H1 === 'hide' ? '#5aa9ff' : '#667085'; g.fillRect(xh - ew('hide'), y, ew('hide'), h);
       if (H1 === 'end') { g.fillStyle = '#cfe4ff'; g.fillRect(x2 - 2, y, 3, h); }
       if (I.para) { g.strokeStyle = '#e6c15a'; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(xs + 0.5, top0()); g.lineTo(xs + 0.5, H); g.stroke(); g.setLineDash([]); g.fillStyle = '#e6c15a'; g.fillText('¶', xs + 3, y - 1 + 6); }
-      if (I.dotsDur) { g.fillStyle = '#ffd84d'; const xd = LX(s - I.dotsDur); for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(xd + ((x1 - xd) * (i + 0.5)) / 3, y + h / 2, 3, 0, 6.3); g.fill(); } }
+      if (I.dotsDur) {
+        g.fillStyle = '#ffd84d'; const xd = LX(s - I.dotsDur); for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(xd + ((x1 - xd) * (i + 0.5)) / 3, y + h / 2, 3, 0, 6.3); g.fill(); }
+        /* 选中行：预备点起点的把手（橙色 = 这一行自己设了时长） */
+        if (sel || H1 === 'dots') { g.fillStyle = l.o && l.o.dotsDur != null ? '#ffb74d' : '#ffd84d'; const bw = H1 === 'dots' ? 4 : 2; g.fillRect(xd - bw / 2, y + h * 0.25, bw, h * 0.5); g.fillRect(xd, y + h / 2 - 0.5, Math.max(0, x1 - xd), 1); }
+      }
       g.save(); g.beginPath(); g.rect(x1, y, Math.max(2, x2 - x1), h); g.clip();
       if (sel) {
         const B = K.bounds(l), hb = H1 === 'tick' ? B[hv.i] : null;
@@ -205,14 +226,14 @@
         /* 一个刻度 = 一个字 / 一个音节（音节内部的字母没有刻度，跟着音节按比例走）；文字裁在自己的区间里 */
         const G = K.groups(l);
         G.forEach((q, gi) => {
-          const i = q.i, u = l.units[i], x = Math.round(LX(u.s)) + 0.5, nx = LX(gi + 1 < G.length ? l.units[G[gi + 1].i].s : l.end), hot = hb && hb.i === i && hb.j === 0, txt = K.gText(l, q);
+          const i = q.i, u = l.units[i], x = Math.round(LX(u.s)) + 0.5, nx = LX(gi + 1 < G.length ? l.units[G[gi + 1].i].s : l.end), hot = hb && hb.i === i && hb.j === 0, txt = (u.n ? '⏎' : '') + K.gText(l, q);
           g.save(); if (hot) { g.strokeStyle = '#ffd84d'; g.lineWidth = 3; }
           g.beginPath(); g.moveTo(x, y + h * (hot ? 0.35 : q.w && !q.f ? 0.6 : 0.5)); g.lineTo(x, y + h); g.stroke(); g.restore();
           if (nx - x > 9 && txt.trim()) { g.save(); g.beginPath(); g.rect(x, y, nx - x - 1, h); g.clip(); g.fillText(txt, x + 2, y + h * 0.28); g.restore(); }
           if (!q.w) K.subTimes(l, i).slice(1, -1).forEach((tm, q) => { const xm = Math.round(LX(tm)) + 0.5, hm = hb && hb.i === i && hb.j === q + 1; g.save(); g.strokeStyle = hm ? '#ffe9a0' : 'rgba(255,216,77,.8)'; g.lineWidth = hm ? 3 : 1; g.beginPath(); g.moveTo(xm, y + h * (hm ? 0.45 : 0.68)); g.lineTo(xm, y + h); g.stroke(); g.restore(); });
           if (K.ui.tapArmed && (B[K.ui.tapIdx] || {}).i === i) { g.fillStyle = '#ffd84d'; g.fillRect(x - 1, y + h - 4, Math.max(3, nx - x), 4); g.fillStyle = '#fff'; }
         });
-      } else { g.fillStyle = '#d5dae3'; g.font = LF; g.fillText(K.lineText(l), x1 + 4, y + h / 2); }
+      } else { g.fillStyle = '#d5dae3'; g.font = LF; g.fillText(K.lineLabel(l), x1 + 4, y + h / 2); }
       g.restore(); g.font = UF;
     });
     /* 循环范围 */

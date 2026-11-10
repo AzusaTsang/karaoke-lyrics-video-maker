@@ -3,8 +3,8 @@
   const K = window.K, T = (k, p) => K.t(k, p), esc = K.esc, et = (k, p) => esc(T(k, p));
   /* 鼠标操作：[位置, [[操作, 效果], …]]（都是翻译 key） */
   K.MOUSE = [
-    ['m.preview', [['m.pClick', 'm.pClickDo'], ['m.pDrag', 'm.pDragDo'], ['m.pScrub', 'm.pScrubDo'], ['m.pDbl', 'm.pDblDo']]],
-    ['m.timeline', [['m.tRuler', 'm.tRulerDo'], ['m.tBlock', 'm.tBlockDo'], ['m.tTick', 'm.tTickDo'], ['m.tEnd', 'm.tEndDo'], ['m.tEdge', 'm.tEdgeDo'],
+    ['m.preview', [['m.pClick', 'm.pClickDo'], ['m.pDrag', 'm.pDragDo'], ['m.pScrub', 'm.pScrubDo'], ['m.pAlt', 'm.pAltDo'], ['m.pDbl', 'm.pDblDo'], ['m.pRight', 'm.pRightDo']]],
+    ['m.timeline', [['m.tRuler', 'm.tRulerDo'], ['m.tBlock', 'm.tBlockDo'], ['m.tTick', 'm.tTickDo'], ['m.tEnd', 'm.tEndDo'], ['m.tEdge', 'm.tEdgeDo'], ['m.tDots', 'm.tDotsDo'],
       ['m.tDbl', 'm.tDblDo'], ['m.tRight', 'm.tRightDo'], ['m.tWheel', 'm.tWheelDo'], ['m.tPan', 'm.tPanDo'], ['m.tShift', 'm.tShiftDo'], ['m.tOverview', 'm.tOverviewDo'], ['m.tResize', 'm.tResizeDo']]],
     ['m.list', [['m.lClick', 'm.lClickDo'], ['m.lDbl', 'm.lDblDo'], ['m.lRight', 'm.lRightDo']]],
     ['m.files', [['m.fDrop', 'm.fDropDo']]],

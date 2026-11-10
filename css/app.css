@@ -102,6 +102,21 @@ button.wact.pri{background:#1d2e47;border-color:var(--acc);color:var(--fg)}butto
 label.blk{display:block;color:var(--mut);font-size:12px;margin-bottom:3px}
 .btns{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.btns.ind{padding-left:calc(var(--lw) + 6px);margin:5px 0}
 .btns.acts .danger{margin-left:auto}
+/* 本行独立样式（行属性）：可折叠；覆盖了的项标橙色，末尾 ↺ = 恢复全局 */
+details.lso{margin:14px 0 6px;border:1px solid var(--line);border-radius:6px;background:#1c1f26}
+details.lso>summary{cursor:pointer;padding:5px 8px;font-size:12px;color:var(--mut);font-weight:600;user-select:none}
+details.lso>summary:hover{color:var(--fg)}
+details.lso[open]>summary{border-bottom:1px solid var(--line)}
+.ovn{font-weight:500;color:var(--warn);margin-left:4px}
+.lsoBody{padding:2px 8px 8px}
+.lsoBody h5{margin:10px 0 3px;font-size:11px;color:var(--mut);font-weight:600}
+.lsoBody .btns{margin:6px 0}.lsoBody .btns button{padding:2px 7px;font-size:12px}
+.lsoBody .btns .danger{margin-left:auto}
+.row.ov>label{color:var(--warn)}
+.row.ov{box-shadow:inset 2px 0 var(--warn);padding-left:4px;margin-left:-6px}
+button.rs{flex:none;width:24px;padding:1px 0;font-size:13px;line-height:1.2;border-color:transparent;background:none;color:var(--warn)}
+button.rs:disabled{visibility:hidden}
+.li .lso{flex:none;font-style:normal;font-size:10px;line-height:14px;padding:0 4px;border-radius:4px;background:#3a2f18;color:#ffcf80}
 .tblWrap{max-height:min(46vh,420px);overflow:auto;border:1px solid var(--line);border-radius:6px;margin-top:6px}
 table{border-collapse:collapse;width:100%}
 td,th{padding:2px 4px;border-bottom:1px solid #20242b;text-align:left}

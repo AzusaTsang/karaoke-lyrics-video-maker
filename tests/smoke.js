@@ -783,6 +783,309 @@ window.addEventListener('load', async () => {
         ok('jpNonPushDragIdentical', tried > 300 && !diffs.length, out.jpSame); }
       K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; }
 
+    // ---- U. 行属性（局部样式 / 位置）与行内换行 ----
+    { const mkP = (lines, st) => K.normalizeProject({ settings: Object.assign({ W: 1920, H: 1080, rows: 2 }, st), lines });
+      const toC = (cx, cy) => { const r = cv.getBoundingClientRect(); return [r.left + cx * r.width / cv.width, r.top + cy * r.height / cv.height]; };
+      const geoOf = (l) => K.geo(l, K.screen().info.get(l.id), cv.width, cv.height);
+      const flat = (G) => JSON.stringify({ s: G.s, w: G.w, x0: G.x0, y: G.y, top: G.top, bottom: G.bottom, rows: G.rows, u: G.L.units, t: G.L.total });
+
+      /* U1. 不回归：空的 o / 和全局相同的覆盖 / 没有换行 —— 几何与像素都和没有这个字段时完全一样；几何也和旧公式一致 */
+      for (const si of [0, 1]) {
+        K.setProject(K.normalizeProject(K.SAMPLES[si].project)); await K.ensureFont(); await wait(30);
+        const S = K.S(), W = 1280, H = 720, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+        const hash = () => { const d = g.getImageData(0, 0, W, H).data; let h = 2166136261; for (let i = 0; i < d.length; i += 3) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
+        const ts = K.screen().ord.filter((x, i) => i % 9 === 2).map((x) => (K.ls(x) + x.end) / 2 + S.offset).concat([K.ls(K.screen().ord[0]) - 1 + S.offset]);
+        const snap = () => ({ geo: K.project.lines.map((l) => flat(K.geo(l, K.screen().info.get(l.id), W, H))), scr: JSON.stringify([...K.screen().info.values()]), px: ts.map((t) => (K.render(g, t, { bg: 'none' }), hash())) });
+        const A = snap();
+        /* 旧公式（改动前的 layout / geo）独立算一遍 */
+        const mc = document.createElement('canvas').getContext('2d'), fb = K.fontBase(), fr = K.fontRuby();
+        const oldGeo = (l, I) => { let x = 0; const us = l.units.map((u) => { mc.font = fb; const bw = mc.measureText(u.t).width + S.spacing * [...u.t].length; let rw = 0; if (u.r) { mc.font = fr; rw = mc.measureText(u.r).width + S.spacing * 0.5 * [...u.r].length; } const w = Math.max(bw, rw), o = { x, w }; x += w; return o; });
+          const s = x ? Math.min(1, (S.maxW * W) / x) : 1, w = x * s, m = S.marginX * W; return { us, s, w, x0: I.align === 'left' ? m : I.align === 'right' ? W - m - w : (W - w) / 2, y: S.posY * H + I.row * K.rowStep() }; };
+        const badOld = K.project.lines.filter((l) => { const I = K.screen().info.get(l.id), G = K.geo(l, I, W, H), o = oldGeo(l, I); return G.s !== o.s || G.w !== o.w || G.x0 !== o.x0 || G.y !== o.y || G.rows.length !== 1 || o.us.some((q, i) => q.x !== G.L.units[i].x || q.w !== G.L.units[i].w); });
+        ok('noRegressGeoMatchesOldFormula:' + si, !badOld.length, badOld.map(K.lineText).slice(0, 3));
+        K.project.lines.forEach((l) => (l.o = {})); K.touch(); const B = snap();
+        ok('noRegressEmptyOverrides:' + si, JSON.stringify(A) === JSON.stringify(B), { a: A.px, b: B.px });
+        const same = {}; K.LSTYLE.forEach((k) => (same[k] = S[k])); K.project.lines.forEach((l) => (l.o = Object.assign({}, same))); K.touch();
+        ok('accessorMergedPath', K.LS(K.project.lines[0]) !== S && K.LS(K.project.lines[0]).size === S.size);
+        const C = snap();
+        ok('noRegressOverridesEqualToGlobal:' + si, JSON.stringify(A) === JSON.stringify(C), { a: A.px, c: C.px });
+        ok('noRegressNoBreaks:' + si, K.project.lines.every((l) => !l.units.some((u) => 'n' in u) && K.nRows(l) === 1));
+        K.project.lines.forEach((l) => delete l.o); K.touch();
+      }
+
+      /* U2. 工程文件里的行属性不可信：未知键 / 坏值丢掉，空了就没有 o，键顺序固定；读写往返不变 */
+      { const X = '"><img src=x onerror="window.__pwn=3">';
+        const raw = JSON.parse(JSON.stringify({ lines: [
+          { start: 1, end: 3, text: 'ab', o: { evil: X, size: X, baseFill: '#GGG', highFill: '#ABCDEF', dx: 5, dy: '0.1', grow: 'sideways', W: 100, rows: 3, layout: 'stack', font: X, dotFill: '', dotsDur: 1e9, glow: -4, weight: 'heavy' } },
+          { start: 4, end: 5, text: 'cd', o: [1, 2] }, { start: 6, end: 7, text: 'ef', o: { size: 'big', grow: 'auto', dx: 0 } }, { start: 8, end: 9, text: 'gh', o: 'nope' },
+          { start: 10, end: 11, text: 'ij', o: { grow: 'center', dy: -0.2, size: 60 } }] }).replace('"evil":', '"__proto__":{"size":1},"evil":'));
+        const p = K.normalizeProject(raw), o0 = p.lines[0].o;
+        out.sanOv = p.lines.map((l) => l.o);
+        ok('sanOvKeys', o0 && Object.keys(o0).join() === 'font,glow,highFill,dotsDur,dotFill,dx,dy', o0);
+        ok('sanOvValues', o0.highFill === '#abcdef' && o0.dotsDur === K.RANGE.dotsDur[1] && o0.glow === 0 && o0.dotFill === '' && o0.dx === 1 && o0.dy === 0.1 && !/[<>]/.test(o0.font) && !('size' in o0) && !('W' in o0) && !('evil' in o0), o0);
+        ok('sanOvEmptyRemoved', !('o' in p.lines[1]) && !('o' in p.lines[2]) && !('o' in p.lines[3]), p.lines.slice(1, 4).map((l) => l.o));
+        ok('sanOvLineOnly', JSON.stringify(p.lines[4].o) === '{"size":60,"dy":-0.2,"grow":"center"}', p.lines[4].o);
+        ok('sanOvNoProto', !({}).size && Object.getPrototypeOf(o0) === Object.prototype);
+        const rt = K.normalizeProject(JSON.parse(JSON.stringify(p)));
+        ok('ovRoundTrip', JSON.stringify(rt.lines) === JSON.stringify(p.lines));
+        K.setProject(p); K.select(p.lines[0].id); K.pref('lsOpen', true); K.showTab('line'); await wait(60);
+        ok('ovNoInjection', !document.querySelector('#tab-line img, #list img') && !window.__pwn && document.querySelector('#tab-line details.lso[open]'), document.querySelectorAll('img').length);
+        ok('listMarksOverrides', document.querySelectorAll('#list .li .lso').length === 2 && document.querySelector(`#list .li[data-id="${p.lines[0].id}"] .lso`));
+        K.pref('lsOpen', null); delete K.prefs.lsOpen; }
+
+      /* U3. 有效设置：继承 / 覆盖 / 全局改了会跟着变；setOv 清空时删掉 o */
+      { K.setProject(mkP([{ start: 1, end: 3, text: 'あいう' }, { start: 4, end: 6, text: 'あいう' }])); const [a, b] = K.project.lines, S = K.S();
+        ok('lsNoOvIsGlobal', K.LS(a) === S && K.LS(b) === S);
+        K.setOv(a, 'size', 120); K.setOv(a, 'baseFill', '#123456'); K.touch();
+        const E = K.LS(a);
+        ok('lsInherits', E.size === 120 && E.baseFill === '#123456' && E.font === S.font && E.strokeW === S.strokeW && E.dx === 0 && E.grow === 'auto' && K.LS(b) === S, E);
+        S.strokeW = 3; K.touch(); ok('lsFollowsGlobal', K.LS(a).strokeW === 3 && K.LS(a).size === 120);
+        ok('layoutUsesEffective', near(K.layout(a).units[0].w, K.layout(b).units[0].w * 120 / S.size, 0.6), [K.layout(a).units[0].w, K.layout(b).units[0].w]);
+        K.setOv(a, 'size', null); K.setOv(a, 'baseFill', null); ok('setOvRemovesEmpty', !('o' in a) && K.LS(a) === S);
+        K.setOv(a, 'dx', 0); ok('dxZeroIsNoOverride', !('o' in a));
+        /* 每行自己的字体也要加载 */
+        K.setOv(a, 'font', "'Georgia', serif"); K.commit('lineStyle');
+        const seen = [], ol = document.fonts.load.bind(document.fonts); document.fonts.load = (f, s) => { seen.push(f); return ol(f, s); };
+        await K.ensureFont(); document.fonts.load = ol;
+        ok('ensureFontPerLine', seen.some((f) => /Georgia/.test(f)) && seen.some((f) => f === K.fontBase()), seen); }
+
+      /* U4. 行面板：本行独立样式 —— 显示继承值、改了成为覆盖、单项恢复、复制 / 粘贴 / 本段 / 全部 / 全部恢复，各一步撤销 */
+      { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); await wait(30); const sc0 = K.screen(), l = sc0.ord[2], id = l.id; K.select(id); K.showTab('line'); await wait(60);
+        const tab = document.getElementById('tab-line'), q = (s) => tab.querySelector(s);
+        ok('lsoClosedWithoutOverrides', q('details.lso') && !q('details.lso').open);
+        const num = q('input[data-o="size"][type="number"]');
+        ok('lsoShowsInherited', num && +num.value === K.S().size && !num.closest('.row').classList.contains('ov'));
+        const rg = q('input[data-o="size"][type="range"]'); rg.value = '100'; rg.dispatchEvent(new Event('input', { bubbles: true }));
+        ok('lsoLivePreviewNoCommit', K.line(id).o && K.line(id).o.size === 100 && K.undoWhy() !== 'lineStyle');
+        num.value = '130'; num.dispatchEvent(new Event('change', { bubbles: true })); await wait(40);
+        ok('lsoEditCreatesOverride', K.line(id).o.size === 130 && K.undoWhy() === 'lineStyle' && q('input[data-o="size"]').closest('.row').classList.contains('ov') && q('details.lso').open, K.line(id).o);
+        const fs = q('select[data-of]'); fs.value = 'Georgia'; fs.dispatchEvent(new Event('change', { bubbles: true })); await wait(40);
+        ok('lsoFontPick', /^'Georgia', /.test(K.line(id).o.font), K.line(id).o.font);
+        q('button[data-ovr="font"]').click(); await wait(40);
+        ok('lsoFieldReset', !('font' in K.line(id).o) && K.line(id).o.size === 130 && K.undoWhy() === 'lineStyle');
+        K.undo(); ok('lsoFieldResetUndo', /Georgia/.test(K.line(id).o.font)); K.redo(); await wait(40);
+        q('input[data-o="dx"][type="number"]').value = '0.05'; q('input[data-o="dx"][type="number"]').dispatchEvent(new Event('change', { bubbles: true })); await wait(40);
+        // 复制 → 粘贴到另一行：样式过去，位置不过去
+        q('button[data-a="ovCopy"]').click(); await wait(30);
+        const other = sc0.ord[5]; K.select(other.id); await wait(40); const before = JSON.stringify(K.project);
+        tab.querySelector('button[data-a="ovPaste"]').click(); await wait(30);
+        ok('lsoPaste', JSON.stringify(K.line(other.id).o) === '{"size":130}' && K.undoWhy() === 'lineStyle', K.line(other.id).o);
+        K.undo(); ok('lsoPasteOneUndo', JSON.stringify(K.project) === before);
+        // 应用到本段 / 全部：一步撤销；目标行原来的位置保留
+        K.select(id); await wait(40); const pi = K.screen().info.get(id).pi, mates = K.screen().ord.filter((x) => x.id !== id && K.screen().info.get(x.id).pi === pi);
+        K.setOv(mates[0], 'dy', -0.1); K.commit('linePos'); const b2 = JSON.stringify(K.project);
+        tab.querySelector('button[data-a="ovPara"]').click(); await wait(30);
+        ok('lsoApplyPara', mates.length > 0 && mates.every((x) => K.line(x.id).o && K.line(x.id).o.size === 130 && !('dx' in K.line(x.id).o)) && K.line(mates[0].id).o.dy === -0.1 && K.screen().ord.filter((x) => K.screen().info.get(x.id).pi !== pi).every((x) => !x.o), mates.length);
+        ok('lsoApplyParaOneUndo', K.undoWhy() === 'lineStyle' && (K.undo(), JSON.stringify(K.project) === b2));
+        tab.querySelector('button[data-a="ovAll"]').click(); await wait(30);
+        ok('lsoApplyAll', K.project.lines.every((x) => x.o && x.o.size === 130) && K.undoWhy() === 'lineStyle');
+        K.undo(); ok('lsoApplyAllOneUndo', JSON.stringify(K.project) === b2);
+        tab.querySelector('button[data-a="ovReset"]').click(); await wait(30);
+        ok('lsoResetAll', !('o' in K.line(id)) && K.undoWhy() === 'lineStyle'); K.undo(); await wait(40);
+        ok('lsoMarkedInList', !!document.querySelector(`#list .li[data-id="${id}"] .lso`));
+        // 折叠状态记在偏好里
+        q('summary.lsoS').click(); await wait(30); ok('lsoCollapsePref', K.pref('lsOpen') === false);
+        K.select(other.id); await wait(40); ok('lsoStaysCollapsed', !tab.querySelector('details.lso').open); delete K.prefs.lsOpen; }
+
+      /* U5. 预备点时长按行：screen 的出现时间 / 预备点时长跟着变；时间线拖动预备点起点、双击恢复自动 */
+      { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.S().offset = 0; K.touch(); const sc1 = K.screen();
+        const l = sc1.ord.find((x, i) => { const I = sc1.info.get(x.id); return i > 0 && I.para && I.dotsDur === 3 && x.showAt == null && K.ls(x) - Math.max(...sc1.ord.slice(0, i).map((y) => sc1.info.get(y.id).hide + K.S().fadeOut)) > 5; }), id = l.id, I0 = sc1.info.get(id), s = K.ls(l);
+        ok('dotsFoundLine', !!l);
+        K.setOv(l, 'dotsDur', 4.5); K.touch(); let I1 = K.screen().info.get(id);
+        out.dotsOv = { before: [I0.show, I0.dotsDur], after: [I1.show, I1.dotsDur] };
+        ok('dotsOverrideScreen', I1.dotsDur === 4.5 && near(I1.show, s - 4.9, 1e-6) && I1.show < I0.show, out.dotsOv);
+        ok('dotsOtherLinesGlobal', K.screen().ord.every((x) => x === l || !K.screen().info.get(x.id).dotsDur || K.screen().info.get(x.id).dotsDur <= 3));
+        K.setOv(l, 'dotsDur', null); K.touch(); K.select(id);
+        K.tl.pps = 80; K.tl.scroll = s - 8; await wait(60);
+        const r = tlc.getBoundingClientRect(), TX = (t) => r.left + K.tl.gut + (t - K.tl.scroll) * 80, Ic = K.screen().info.get(id), y = r.top + 22 + Ic.row * 46 + 20, xd = TX(s - Ic.dotsDur);
+        ev(tlc, 'pointermove', xd, y); const tipHover = document.getElementById('tip').textContent;
+        ev(tlc, 'pointerdown', xd, y, { shiftKey: true }); ev(tlc, 'pointermove', xd - 80, y, { shiftKey: true });
+        const tipDrag = document.getElementById('tip').textContent; ev(tlc, 'pointerup', xd - 80, y, { shiftKey: true });
+        let L1 = K.line(id); I1 = K.screen().info.get(id);
+        out.dotsDrag = { o: L1.o, dots: I1.dotsDur, show: I1.show, s, tipHover, tipDrag };
+        ok('tlDotsDrag', L1.o && near(L1.o.dotsDur, 4, 0.02) && near(I1.dotsDur, L1.o.dotsDur, 1e-6) && I1.show <= s - I1.dotsDur - 0.05 + 1e-6 && K.undoWhy() === 'lineStyle', out.dotsDrag);
+        ok('tlDotsTooltip', tipHover.includes(K.t('tip.dots', { d: K.fmt3(3), t: K.fmt3(s - 3) })) && tipDrag.includes(K.fmt3(L1.o.dotsDur)), [tipHover, tipDrag]);
+        /* 拖得太远：被上一段挡住，存下来的值收到实际能显示的长度 */
+        const xd2 = TX(s - I1.dotsDur); await wait(30);
+        ev(tlc, 'pointerdown', xd2, y, { shiftKey: true }); ev(tlc, 'pointermove', xd2 - 2000, y, { shiftKey: true }); ev(tlc, 'pointerup', xd2 - 2000, y, { shiftKey: true });
+        L1 = K.line(id); I1 = K.screen().info.get(id);
+        ok('tlDotsClampedToWindow', L1.o.dotsDur < 25 && near(L1.o.dotsDur, I1.dotsDur, 1e-3) && I1.show >= K.screen().info.get(K.screen().ord[K.screen().ord.indexOf(L1) - 1].id).hide - 1e-6, [L1.o.dotsDur, I1.dotsDur, I1.show]);
+        await wait(30); const xd3 = TX(s - I1.dotsDur);
+        tlc.dispatchEvent(new MouseEvent('dblclick', { clientX: xd3, clientY: y, bubbles: true }));
+        ok('tlDotsDblClickReset', !K.line(id).o && K.screen().info.get(id).dotsDur === 3 && K.undoWhy() === 'lineStyle', K.line(id).o); }
+
+      /* U6. 文本 <-> 单元：换行 / \n 字面 / 往返；retext 保留时间；fixLine 清洗 */
+      { const P = (s) => K.parseText(s), T2 = (s) => K.unitsToText(P(s));
+        ok('brkParse', P('ab\ncd')[2].n === 1 && P('ab\ncd').length === 4 && !P('ab\ncd').slice(0, 2).some((u) => u.n), P('ab\ncd'));
+        ok('brkLiteral', JSON.stringify(P('ab\\ncd')) === JSON.stringify(P('ab\ncd')) && T2('ab\\ncd') === 'ab\ncd');
+        ok('brkRoundTrip', ['ab\ncd', '王道{おうどう}を\n征{ゆ}く', 'Fon|taine\nreine', 'a b\n c'].every((s) => T2(s) === s), ['ab\ncd', 'a b\n c'].map(T2));
+        ok('brkCollapseEdges', T2('\n\nab\n\n\ncd\n') === 'ab\ncd' && T2('a\r\nb') === 'a\nb');
+        const fx = (s) => { const l = K.newLine({ units: P(s), end: 9 }); l.units.forEach((u, i) => (u.s = i)); K.fixLine(l); return K.unitsToText(l.units); };
+        ok('brkFixLineDropsEmptyRows', fx('a\n \nb') === 'a \nb' && fx('a\n ') === 'a ' && fx(' \na') === ' a', [fx('a\n \nb'), fx('a\n '), fx(' \na')]);
+        const np = K.normalizeProject({ lines: [{ end: 3, units: [{ t: 'a', s: 0, n: 1 }, { t: 'b', s: 1, n: true }, { t: 'c', s: 2, n: '<x>' }] }, { start: 5, end: 8, text: 'xy\nzw' }] });
+        ok('brkNormalize', np.lines[0].units.map((u) => u.n || 0).join() === '0,1,0' && K.unitsToText(np.lines[1].units) === 'xy\nzw', np.lines.map((l) => K.unitsToText(l.units)));
+        // retext：插入 / 去掉换行，没改动的字时间不变
+        K.setProject(mkP([{ start: 10, end: 16, text: 'あいうえおか' }])); const l = K.project.lines[0], s0 = l.units.map((u) => u.s);
+        K.retext(l, 'あいう\nえおか'); ok('retextBreakKeepsTiming', l.units.map((u) => u.s).join() === s0.join() && l.units[3].n === 1);
+        K.retext(l, 'あいう えおか'); ok('retextBreakToSpace', l.units.length === 7 && l.units[0].s === s0[0] && l.units[6].s === s0[5] && !l.units.some((u) => u.n));
+        K.retext(l, 'あいうえおか'); K.retext(l, 'あい\\nうえおか'); ok('retextLiteralBreak', l.units.map((u) => u.s).join() === s0.join() && l.units[2].n === 1);
+        K.retext(l, 'あいうえおか'); ok('retextBreakRemoved', l.units.map((u) => u.s).join() === s0.join() && !l.units.some((u) => u.n));
+        // 行面板：Shift+Enter 插入换行，提交后成为行内换行
+        K.commit('text'); K.select(l.id); K.showTab('line'); await wait(60);
+        const ta = document.getElementById('lnText'); ta.focus(); ta.setSelectionRange(3, 3);
+        ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }));
+        out.shiftEnter = ta.value;
+        ok('shiftEnterInsertsNewline', ta.value === 'あいう\nえおか' && ta.dataset.dirty === '1', ta.value);
+        ta.dispatchEvent(new Event('change', { bubbles: true })); ta.blur(); await wait(40);
+        ok('shiftEnterCommitsBreak', K.project.lines[0].units[3].n === 1 && K.project.lines[0].units.map((u) => u.s).join() === s0.join() && K.undoWhy() === 'text' && document.getElementById('lnText').value === 'あいう\nえおか' && document.getElementById('lnText').rows >= 3);
+        ok('listShowsBreakMark', document.querySelector('#list .li .x').textContent.includes('⏎'));
+        // 粘贴歌词：一行一句，行里的 \n 字面 = 行内换行
+        const A = K.addLyrics('ab\\ncd\nef', { mode: 'replace', start: 0, dur: 2, gap: 4 });
+        ok('pasteLiteralBreak', A.length === 2 && K.unitsToText(A[0].units) === 'ab\ncd' && K.unitsToText(A[1].units) === 'ef'); K.undo(); }
+
+      /* U7. 音节：换行处一定分组；词中间的换行强制新音节；组从不跨过换行 */
+      { const mk = (s) => { const l = K.newLine({ units: K.parseText(s), end: 10 }); K.evenSplit(l, 0, 10); K.fixLine(l); return l; };
+        const gt = (l) => K.groups(l).map((g) => K.gText(l, g)).join('|');
+        const a = mk('fontaine'), b = mk('fonta\naine'), c = mk('rock-\nroll here');
+        out.brkSyl = [gt(a), gt(b), gt(c)];
+        ok('brkForcesSyllable', gt(a) === 'fon|tai|ne' && gt(b) === 'fon|ta|ai|ne' && K.groups(b).find((g) => g.i === 5).f === 1, out.brkSyl);
+        ok('brkGroupsNeverCross', [a, b, c, mk('a, \nb. c\nd')].every((l) => K.groups(l).every((g) => !l.units.slice(g.i + 1, g.e).some((u) => u.n))), out.brkSyl);
+        ok('brkHyphenStaysBefore', gt(c) === 'rock|roll|he|re' && K.lineText(c).indexOf('-') === 4 && K.groups(c)[0].e === 5, [gt(c), K.groups(c)[0]]); }
+
+      /* U8. 多排几何：2 排 / 3 排 × 对齐 × 生长方向 */
+      { const txt = ['あいうえおかき\nくけ', 'あいうえ\nおかきくけこさし\nすせ'];
+        const lines = []; let t = 1;
+        ['left', 'center', 'right'].forEach((al) => ['up', 'down', 'center', 'auto'].forEach((gr) => txt.forEach((tx) => { lines.push({ start: t, end: t + 1, text: tx, align: al, row: 0, o: gr === 'auto' ? undefined : { grow: gr } }); t += 2; })));
+        K.setProject(mkP(lines, { paraGap: 0.5 })); await wait(40);
+        const S = K.S(), W = 1920, H = 1080, m = S.marginX * W, bad = [];
+        K.project.lines.forEach((l) => {
+          const I = K.screen().info.get(l.id), G = K.geo(l, I, W, H), R = G.rows, N = R.length, E = K.LS(l), st = K.wrapStep(E, G.L) * G.s, base = S.posY * H + I.row * K.rowStep(), gr = (l.o && l.o.grow) || 'auto', eff = K.grow(l, I);
+          if (N !== K.nRows(l) || N < 2) bad.push(['rows', N]);
+          if (gr === 'auto' && eff !== 'up') bad.push(['autoRow0Up', eff]);
+          if (eff === 'up' && !near(R[N - 1].y, base)) bad.push(['up', R.map((r) => r.y)]);
+          if (eff === 'down' && !near(R[0].y, base)) bad.push(['down', R.map((r) => r.y)]);
+          if (eff === 'center' && !near((R[0].y + R[N - 1].y) / 2, base)) bad.push(['center', R.map((r) => r.y)]);
+          R.forEach((r, k) => {
+            if (k && !near(r.y - R[k - 1].y, st)) bad.push(['step', k]);
+            if (I.align === 'left' && !near(r.x0, m)) bad.push(['left', k, r.x0]);
+            if (I.align === 'right' && !near(r.x0 + r.w, W - m)) bad.push(['right', k]);
+            if (I.align === 'center' && !near(r.x0 + r.w / 2, W / 2)) bad.push(['center', k]);
+          });
+          if (!near(Math.max(...R.map((r) => r.w)), G.L.total * G.s) || st < S.size * G.s) bad.push(['widest/step']);
+          const B = K.blockBox(G); if (!near(B.top, R[0].y - G.top * G.s) || !near(B.bot, R[N - 1].y + G.bottom * G.s) || !near(B.x0, Math.min(...R.map((r) => r.x0)))) bad.push(['box']);
+        });
+        ok('multiRowGeometry', !bad.length && K.project.lines.length === 24, bad.slice(0, 4));
+        // 自动方向：行位在上半部分往上长，其余往下；只有一个行位也往上
+        const I0 = { row: 0 }, I1 = { row: 1 }, I2 = { row: 2 };
+        const dirs = (rows) => { S.rows = rows; K.touch(); return [I0, I1, I2].map((I) => K.growAuto(I)).join(); };
+        out.autoGrow = [dirs(1), dirs(2), dirs(3)];
+        ok('autoGrowRule', out.autoGrow[0].startsWith('up') && out.autoGrow[1].startsWith('up,down') && out.autoGrow[2] === 'up,up,down', out.autoGrow);
+        S.rows = 2; K.touch();
+        // 最大宽度：按最宽的一排缩放整块；有注音的第二排行距更大
+        const wide = K.normalizeProject({ lines: [{ start: 1, end: 2, text: 'あ'.repeat(40) + '\nい' }, { start: 3, end: 4, text: 'あい\n王道{おうどう}' }, { start: 5, end: 6, text: 'あい\nうえ' }] }).lines;
+        K.project.lines = wide; K.touch();
+        const Gw = geoOf(wide[0]), Gr = geoOf(wide[1]), Gn = geoOf(wide[2]);
+        ok('fitByWidestRow', near(Gw.rows[0].w, S.maxW * cv.width, 0.5) && Gw.s < 1 && near(Gw.rows[1].w, Gw.L.rows[1].w * Gw.s), [Gw.rows[0].w, S.maxW * cv.width, Gw.s]);
+        ok('wrapStepRuby', near(Gr.rows[1].y - Gr.rows[0].y, S.size * (1 + S.wrapGap) + S.size * S.rubyRatio + S.rubyGap) && near(Gn.rows[1].y - Gn.rows[0].y, S.size * (1 + S.wrapGap)), [Gr.rows[1].y - Gr.rows[0].y, Gn.rows[1].y - Gn.rows[0].y]);
+        // 换行旁边的空白不占位置
+        const sp = K.normalizeProject({ lines: [{ start: 1, end: 2, text: 'ab \n cd' }] }).lines[0]; K.project.lines = [sp]; K.touch(); const Ls = K.layout(sp);
+        ok('brkEdgeSpaceZeroWidth', Ls.units[2].w === 0 && Ls.units[3].w === 0 && Ls.rows.length === 2 && near(Ls.rows[0].w, Ls.units[0].w + Ls.units[1].w), Ls.units.map((u) => u.w)); }
+
+      /* U9. 擦除位置 ↔ 时间：跨排单调、互逆；光标画在正在唱的那一排；拖到第二排校对的字 */
+      { K.setProject(mkP([{ start: 10, end: 20, text: 'あいうえお\nかきくけこ', align: 'center', row: 0 }])); await K.ensureFont(); const l = K.project.lines[0], id = l.id; K.select(id);
+        K.seek(12.5); await wait(60);
+        const G = geoOf(l), L = G.L; let mono = true, inv = 0, prev = -1;
+        for (let t = 9.9; t <= 20.1; t += 0.05) { const X = K.progressEdge(l, L, t); if (X < prev - 1e-9) mono = false; prev = X; if (t > 10 && t < 20) inv = Math.max(inv, Math.abs(K.edgeToTime(l, L, X) - t)); }
+        ok('edgeMonotoneAcrossRows', mono && near(K.progressEdge(l, L, 20), L.span) && L.rows.length === 2, prev);
+        ok('edgeTimeInverse', inv < 1e-6, inv);
+        const e1 = K.edgePt(G, K.progressEdge(l, L, 12.5)), e2 = K.edgePt(G, K.progressEdge(l, L, 17.5)), e3 = K.edgePt(G, K.progressEdge(l, L, 15));
+        ok('edgeRowOfCursor', e1.k === 0 && e2.k === 1 && e3.k === 1 && near(e3.x, G.rows[1].x0) && near(e1.y, G.rows[0].y) && near(e2.y, G.rows[1].y), [e1, e2, e3]);
+        ok('ptToXOnRow', near(K.ptX(G, G.rows[1].x0 + 1e-9, 1), L.rows[1].off) && near(K.ptX(G, G.rows[0].x0 + G.rows[0].w + 300, 0), L.rows[0].off + L.rows[0].w) && K.ptRow(G, G.rows[1].y - 10) === 1 && K.ptRow(G, G.rows[0].y - 10) === 0);
+        // 拖光标：从第一排拖到第二排的「き」，这个字的开始 = 当前时间
+        const T0 = 12.5, ex = e1, [cx, cy] = toC(ex.x, ex.y - K.S().size * 0.4), tx = G.rows[1].x0 + (L.units[6].x - L.rows[1].off) * G.s + 1, [mx, my] = toC(tx, G.rows[1].y - K.S().size * 0.4);
+        ev(cv, 'pointerdown', cx, cy); ev(cv, 'pointermove', mx, my); const tip = document.getElementById('tip').textContent; ev(cv, 'pointerup', mx, my);
+        const L2 = K.line(id); out.row2Retime = { s: L2.units.map((u) => u.s), tip };
+        ok('cursorDragSecondRow', near(L2.units[6].s, T0) && L2.units[6].t === 'き' && L2.units.every((u, i, a) => !i || u.s >= a[i - 1].s) && K.undoWhy() === 'retime' && tip.includes('き'), out.row2Retime);
+        K.undo();
+        // 指着第二排的开头：选中的是第二排第一个字，不是第一排的行尾
+        ev(cv, 'pointerdown', cx, cy); const [hx, hy] = toC(G.rows[1].x0 + 2, G.rows[1].y - 20); ev(cv, 'pointermove', hx, hy); ev(cv, 'pointerup', hx, hy);
+        ok('cursorDragRowStart', near(K.line(id).units[5].s, T0) && K.line(id).units[5].t === 'か', K.line(id).units.map((u) => u.s)); K.undo();
+        // 浏览模式：拖到第二排 = 第二排那个位置的时间
+        K.ui.tool = 'scrub'; ev(cv, 'pointerdown', cx, cy); const [sx, sy] = toC(G.rows[1].x0 + (L.units[7].x - L.rows[1].off) * G.s + 0.5 * L.units[7].w * G.s, G.rows[1].y - 20); ev(cv, 'pointermove', sx, sy); ev(cv, 'pointerup', sx, sy); K.ui.tool = 'retime';
+        ok('scrubSecondRow', near(K.now() - K.S().offset, 17.5, 0.02), K.now());
+        // 命中：选择框盖住整块；光标在第二排时能抓住
+        K.seek(17.5 + K.S().offset); await wait(30); const e4 = K.edgePt(G, K.progressEdge(l, L, 17.5)), [qx, qy] = toC(e4.x, e4.y - 20), before = JSON.stringify(K.line(id).units);
+        ev(cv, 'pointerdown', qx, qy); ev(cv, 'pointerup', qx, qy); ok('cursorOnSecondRowGrabbable', JSON.stringify(K.line(id).units) === before && K.ui.sel === id); }
+
+      /* U10. Alt+拖动 = 位置偏移（按画布像素），吸附；Ctrl+方向键微移；右键菜单“位置恢复原样”；换画布尺寸后比例不变 */
+      { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); await K.ensureFont(); const l = K.screen().ord[2], id = l.id; K.select(id); K.seek(28 + K.S().offset); await wait(60);
+        const G0 = geoOf(l), B0 = K.blockBox(G0), [ax, ay] = toC(G0.x0 + G0.w * 0.3, (B0.top + B0.bot) / 2), r = cv.getBoundingClientRect(), k = r.width / cv.width;
+        ev(cv, 'pointerdown', ax, ay, { altKey: true }); ev(cv, 'pointermove', ax + 150 * k, ay - 90 * k, { altKey: true, shiftKey: true }); const tip = document.getElementById('tip').textContent; ev(cv, 'pointerup', ax + 150 * k, ay - 90 * k, { altKey: true });
+        const L1 = K.line(id), G1 = geoOf(L1);
+        out.altDrag = { o: L1.o, dx: G1.x0 - G0.x0, dy: G1.y - G0.y, tip };
+        ok('altDragMoves', near(G1.x0 - G0.x0, 150, 1) && near(G1.y - G0.y, -90, 1) && near(L1.o.dx * cv.width, G1.x0 - G0.x0, 1e-3) && K.undoWhy() === 'linePos' && K.ui.sel === id && JSON.stringify(L1.units) === JSON.stringify(l.units), out.altDrag);
+        ok('altDragTooltip', tip.includes(String(Math.round(L1.o.dx * K.S().W))) && tip.includes(String(Math.round(L1.o.dy * K.S().H))), tip);
+        // 选择框 / 光标跟着走（命中测试用新位置）
+        const B1 = K.blockBox(G1), [bx2, by2] = toC((B1.x0 + B1.x1) / 2, (B1.top + B1.bot) / 2); K.select(null);
+        ev(cv, 'pointerdown', bx2, by2); ev(cv, 'pointerup', bx2, by2); ok('hitFollowsOffset', K.ui.sel === id);
+        // 吸附到原位：拖回去差 5px 也会归零
+        const [cx2, cy2] = toC((B1.x0 + B1.x1) / 2, (B1.top + B1.bot) / 2);
+        ev(cv, 'pointerdown', cx2, cy2, { altKey: true }); ev(cv, 'pointermove', cx2 - 145 * k, cy2 + 87 * k, { altKey: true }); const tipS = document.getElementById('tip').textContent; ev(cv, 'pointerup', cx2 - 145 * k, cy2 + 87 * k, { altKey: true });
+        ok('altDragSnapsToZero', !K.line(id).o && tipS.includes(K.t('tip.posSnap')), [K.line(id).o, tipS]);
+        // 吸附到画面中线（整块中心）
+        const G2 = geoOf(K.line(id)), B2 = K.blockBox(G2), c0 = (B2.x0 + B2.x1) / 2, [px, py] = toC(c0, (B2.top + B2.bot) / 2), want = cv.width / 2 - c0 + 4;
+        ev(cv, 'pointerdown', px, py, { altKey: true }); ev(cv, 'pointermove', px + want * k, py + 40 * k, { altKey: true }); ev(cv, 'pointerup', px + want * k, py + 40 * k, { altKey: true });
+        const G3 = geoOf(K.line(id)); ok('altDragSnapsToCenter', near((G3.x0 + G3.x0 + G3.w) / 2, cv.width / 2, 0.02), [(G3.x0 + G3.x0 + G3.w) / 2, cv.width / 2]);
+        // Ctrl+方向键
+        const dx0 = K.line(id).o.dx; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', ctrlKey: true, bubbles: true, cancelable: true }));
+        ok('ctrlArrowNudges', near(K.line(id).o.dx - dx0, 4 / K.S().W, 1e-5) && K.undoWhy() === 'linePos', K.line(id).o);
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+        ok('ctrlShiftArrowNudges', near(K.line(id).o.dy * K.S().H - 40, 20, 0.5), K.line(id).o.dy * K.S().H);
+        // 比例在换画布尺寸后保持
+        const fx = K.line(id).o.dx; K.S().W = 1280; K.touch(); const G4 = K.geo(K.line(id), K.screen().info.get(id), 1280, K.S().H); K.undo(); K.redo();
+        ok('offsetIsFraction', K.line(id).o.dx === fx && near(G4.x0 - K.geo(Object.assign({}, K.line(id), { o: undefined }), K.screen().info.get(id), 1280, K.S().H).x0, fx * 1280, 1e-6));
+        K.S().W = 2582; K.touch();
+        // 右键预览里的歌词 = 行菜单，含“位置恢复原样”
+        await wait(30); const G5 = geoOf(K.line(id)), B5 = K.blockBox(G5), [rx, ry] = toC((B5.x0 + B5.x1) / 2, (B5.top + B5.bot) / 2);
+        cv.dispatchEvent(new MouseEvent('contextmenu', { clientX: rx, clientY: ry, bubbles: true, cancelable: true }));
+        const mb = [...document.querySelectorAll('#menu button')], rp = mb.find((b) => b.textContent === K.t('menu.resetPos'));
+        ok('stageContextMenu', !document.getElementById('menu').hidden && !!rp && mb.some((b) => b.textContent === K.t('menu.split')), mb.map((b) => b.textContent));
+        rp.click(); ok('resetPosition', !K.line(id).o && K.undoWhy() === 'linePos'); }
+
+      /* U11. 拆分 / 合并 / 和声行：换行和行属性 */
+      { K.setProject(mkP([{ start: 1, end: 7, text: 'ab cd\nef gh', o: { size: 100, dx: 0.1 } }, { start: 8, end: 10, text: 'ij\nkl' }])); const [a, b] = K.project.lines;
+        const d = K.ops.dup(a);
+        ok('dupCopiesOvAndBreaks', JSON.stringify(d.o) === JSON.stringify(a.o) && d.o !== a.o && K.unitsToText(d.units) === 'ab cd\nef gh');
+        K.undo(); const a2 = K.project.lines[0], at = a2.units[5].s;
+        const nl = K.ops.split(a2, at - 0.001);
+        ok('splitAtBreak', nl && K.unitsToText(nl.units) === 'ef gh' && !nl.units.some((u) => u.n) && K.unitsToText(K.project.lines[0].units) === 'ab cd' && JSON.stringify(nl.o) === '{"size":100,"dx":0.1}' && nl.o !== K.project.lines[0].o, nl && [K.unitsToText(nl.units), nl.o]);
+        K.undo(); const a3 = K.project.lines[0], n2 = K.ops.split(a3, a3.units[3].s - 0.001);
+        ok('splitKeepsLaterBreak', n2 && K.unitsToText(n2.units) === 'cd\nef gh' && n2.units[2].n === 1 && n2.o.size === 100);
+        K.undo(); K.ops.merge(K.project.lines[0]); const mg = K.project.lines[0];
+        ok('mergeKeepsFirstOvNoNewBreak', K.unitsToText(mg.units) === 'ab cd\nef gh ij\nkl' && mg.units.filter((u) => u.n).length === 2 && JSON.stringify(mg.o) === '{"size":100,"dx":0.1}', K.unitsToText(mg.units)); }
+
+      /* U12. 导出：ASS \N、SRT 往返、LRC 用空格；ASS 带行属性；自动注音不跨换行 */
+      { K.setProject(mkP([{ start: 1, end: 3, text: 'あい\nうえ' }, { start: 4, end: 6, text: 'Hello \nworld', o: { size: 120, baseFill: '#123456' } }, { start: 7, end: 9, text: 'plain line' }])); K.S().offset = 0;
+        const ass = K.exportAssText(), dl = ass.split('\n').filter((x) => x.startsWith('Dialogue:')), txt = (d) => d.split(',').slice(9).join(',');
+        out.assBrk = dl.map(txt);
+        ok('assBreak', txt(dl[0]).replace(/\{[^}]*\}/g, '') === 'あい\\Nうえ' && (txt(dl[0]).match(/\\kf/g) || []).length === 4 && txt(dl[1]).replace(/\{[^}]*\}/g, '') === 'Hello \\Nworld', out.assBrk);
+        ok('assLineOverrides', /\\fs120/.test(txt(dl[1])) && /\\2c&H563412&/.test(txt(dl[1])) && !/\\fs/.test(txt(dl[0])) && !/\\fs/.test(txt(dl[2])), out.assBrk);
+        const srt = K.exportSrtText(), back = K.normalizeProject({ lines: K.parseSrt(srt) }).lines;
+        out.srtBrk = srt;
+        ok('srtBreakNewline', srt.includes('\nあい\nうえ\n') && srt.includes('\nHello\nworld\n'), srt);
+        ok('srtRoundTrip', back.length === 3 && K.unitsToText(back[0].units) === 'あい\nうえ' && K.unitsToText(back[1].units) === 'Hello\nworld' && K.unitsToText(back[2].units) === 'plain line' && back.every((x, i) => near(K.ls(x), K.ls(K.project.lines[i]), 0.002) && near(x.end, K.project.lines[i].end, 0.002)), back.map((x) => K.unitsToText(x.units)));
+        const lrc = K.exportLrcText(false), lrcW = K.exportLrcText(true), rw = K.normalizeProject(K.parseLrc(lrcW)).lines;
+        ok('lrcBreakIsSpace', /\]あい うえ$/m.test(lrc) && /\]Hello world$/m.test(lrc) && !/\n(?!\[)/.test(lrc.trim()), lrc);
+        ok('lrcWordsBreakIsSpace', rw.map((x) => K.lineText(x)).join('|') === 'あい うえ|Hello world|plain line' && (lrcW.match(/\n/g) || []).length === 6, [rw.map(K.lineText), lrcW]);
+        // 自动注音：分词不跨换行，换行标记留在那一排的第一个字上
+        const stubW = { '王道': 'オウドウ', '王': 'オウ', '道': 'ドウ' }, KW = Object.keys(stubW).sort((p, q) => q.length - p.length);
+        K.furi.tokenizer = { tokenize: (t) => { const o = []; let i = 0; while (i < t.length) { const w = KW.find((x) => t.startsWith(x, i)); if (w) { o.push({ surface_form: w, reading: stubW[w] }); i += w.length; } else { o.push({ surface_form: t[i] }); i++; } } return o; } };
+        K.setProject(mkP([{ start: 1, end: 4, text: '王\n道を' }, { start: 5, end: 8, text: '王道を' }]));
+        K.furi.run('all', false); K.furi.tokenizer = null;
+        out.furiBrk = K.project.lines.map((x) => K.unitsToText(x.units));
+        ok('furiRespectsBreaks', out.furiBrk[0] === '王{おう}\n道{どう}を' && out.furiBrk[1] === '王道{おうどう}を' && K.project.lines[0].units[1].n === 1, out.furiBrk); }
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; }
+
     // ---- H. 拖入多个文件：全部处理（工程在前，媒体在后） ----
     { const mk = (title) => new File([JSON.stringify({ title, lines: [{ start: 1, end: 2, text: title }] })], title + '.kara.json', { type: 'application/json' });
       const dt = new DataTransfer(); dt.items.add(mk('DropA')); dt.items.add(mk('DropB'));

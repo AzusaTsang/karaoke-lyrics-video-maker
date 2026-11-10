@@ -109,7 +109,8 @@
     const ts = (s) => { const m = s.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000 : 0; };
     return txt.replace(/^﻿/, '').replace(/\r/g, '').split(/\n\s*\n/).map((b) => {
       const L = b.trim().split('\n'), k = L.findIndex((x) => x.includes('-->')); if (k < 0) return null;
-      const [a, c] = L[k].split('-->'); return { start: ts(a), end: ts(c), text: L.slice(k + 1).join(' ').trim() };
+      /* 多行的字幕 = 一行带行内换行的歌词 */
+      const [a, c] = L[k].split('-->'); return { start: ts(a), end: ts(c), text: L.slice(k + 1).map((s) => s.trim()).filter(Boolean).join('\n') };
     }).filter((c) => c && c.text);
   }
   K.parseSrt = parseSrt;

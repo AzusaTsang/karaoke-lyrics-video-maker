@@ -30,6 +30,9 @@
     { grp: 'line', k: ['1', '2', '3', '4'], label: 'k.row', hint: 'h.row', sel: 1, run: (e, i) => K.ops.set(L(), 'row', i) },
     { grp: 'line', k: ['0'], label: 'k.rowAuto', sel: 1, run: () => K.ops.set(L(), 'row', null) },
     { grp: 'line', k: ['Delete'], label: 'k.del', sel: 1, run: () => K.ops.del(L()) },
+    /* 移动选中行在画面上的位置（行属性的位置偏移，画布像素） */
+    { grp: 'line', k: ['Ctrl+ArrowLeft', 'Ctrl+ArrowRight', 'Ctrl+ArrowUp', 'Ctrl+ArrowDown'], label: 'k.nudgePos', sel: 1, run: (e, i) => K.ops.nudgePos(L(), [-4, 4, 0, 0][i], [0, 0, -4, 4][i]) },
+    { grp: 'line', k: ['Ctrl+Shift+ArrowLeft', 'Ctrl+Shift+ArrowRight', 'Ctrl+Shift+ArrowUp', 'Ctrl+Shift+ArrowDown'], label: 'k.nudgePos5', sel: 1, run: (e, i) => K.ops.nudgePos(L(), [-20, 20, 0, 0][i], [0, 0, -20, 20][i]) },
     { grp: 'view', k: ['F'], label: 'k.fitSel', sel: 1, run: () => K.tlFitSel() },
     { grp: 'view', k: ['Shift+F'], label: 'k.fitAll', run: () => K.tlFit() },
     { grp: 'view', k: ['=', '-'], label: 'k.zoom', run: (e, i) => K.tlZoom(i ? 1 / 1.4 : 1.4) },

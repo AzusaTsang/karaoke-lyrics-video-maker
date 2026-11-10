@@ -210,6 +210,28 @@
     'furi.done': '已添加 {n} 处注音（{lines} 行）。自动注音可能有误，请逐句检查。', 'furi.doneKept': '已添加 {n} 处注音（{lines} 行），保留了 {kept} 处原有注音。自动注音可能有误，请逐句检查。',
     'furi.miss': '有 {n} 个词没能得到读音，已保持原样。',
     'tip.syl': "音节「{s}」（{w}）", 'menu.sylSplit': "在此处拆分音节…", 'menu.sylMerge': "与前一个音节合并", 'menu.sylReset': "音节恢复为自动划分", 'menu.evenSyl': "音节内字母均分（这一行）", 'menu.evenSylAll': "音节内字母均分（全部歌词）", 'line.evenSyl': "音节内字母均分", 'line.evenSylTip': "音节开头不动，把每个音节里的字母在它和下一个音节之间平均分配（修复挤在一起的字母）；词里几个音节挤在同一时刻时，先把它们在词里摊开", 'line.sylMenu': "音节：拆分 / 合并", 'line.syl_html': "拉丁、西里尔、希腊字母按<b>音节</b>定时（自动划分）。点「⋯」或右键音节行可拆分 / 合并；也可以在歌词文字里两个字母之间写 <code>|</code> 来分开音节，如 <code>Fon|taine</code>。", 'u.syl': "修改音节划分", 'u.evenSyl': "音节内字母均分", 'msg.evenSyl': "已均分 {n} 行的音节内字母", 'msg.evenSylNone': "没有需要调整的音节",
+
+    /* ---- 本行独立样式（行属性）/ 行内换行 ---- */
+    'line.brkHint': 'Shift+Enter（或输入 \\n）= 在这一行里换行，分成几排显示；可配合下面「本行独立样式」里的位置偏移调整。',
+    'line.gStyle': '本行独立样式', 'line.ovCount': '已改 {n} 项',
+    'line.ovLead': '这里的设置只影响这一行。没改过的项显示全局设置（「样式」「版面」页），改了就成为这一行自己的值（橙色标出）；点 ↺ 恢复使用全局设置。',
+    'line.ovFieldReset': '恢复使用全局设置',
+    'line.ovCopy': '复制样式', 'line.ovCopyTip': '复制这一行的独立样式（不含位置）',
+    'line.ovPaste': '粘贴样式', 'line.ovPasteTip': '把复制的样式套到这一行（位置不变）',
+    'line.ovPara': '应用到本段', 'line.ovParaTip': '把这一行的样式套到同一段落的其他行（各行位置不变）',
+    'line.ovAll': '应用到全部', 'line.ovAllTip': '把这一行的样式套到其他所有行（各行位置不变）',
+    'line.ovReset': '本行恢复全局样式', 'line.ovResetTip': '去掉这一行的所有独立设置（包括位置偏移）',
+    'line.ovPosHint': '在预览里按住 Alt 拖动这一行可以移动它（吸附到原位和画面中线，同时按住 Shift 不吸附）；Ctrl+方向键微移。',
+    'line.gPos': '位置', 'line.gTextS': '文字', 'line.gColors': '颜色（未唱 / 已唱）', 'line.gRuby': '注音', 'line.gDots': '预备点',
+    'f.dx': '水平偏移(×宽)', 'f.dy': '垂直偏移(×高)', 'f.grow': '换行后往哪长', 'f.growAuto': '自动（{d}）', 'f.growUp': '向上', 'f.growDown': '向下', 'f.growCenter': '以基线为中心',
+    'f.wrapGap': '行内换行间距', 'f.dotColors': '圆点颜色（等待 / 倒数）', 'f.followLyric': '恢复为跟随歌词填充色',
+    'msg.ovCopied': '已复制这一行的样式', 'msg.ovNone': '没有其他行可以应用', 'msg.ovApplied': '已把样式应用到另外 {n} 行',
+    'u.lineStyle': '修改本行样式', 'u.linePos': '移动行的位置', 'list.ov': '这一行有独立样式', 'menu.resetPos': '位置恢复原样',
+    'tip.pos': '偏移 x {x} px · y {y} px', 'tip.posSnap': '已吸附 · 按住 Shift 不吸附', 'tip.dots': '预备点 {d} 秒（从 {t} 秒开始）',
+    'k.nudgePos': '把选中行在画面上移动 4 像素', 'k.nudgePos5': '把选中行在画面上移动 20 像素',
+    'm.pAlt': '按住 Alt 拖动歌词', 'm.pAltDo': '移动这一行在画面上的位置（「本行独立样式」里的位置偏移）；吸附到原位和画面中线，同时按住 Shift 不吸附',
+    'm.pRight': '右键歌词', 'm.pRightDo': '与时间线相同的右键菜单（含「位置恢复原样」）',
+    'm.tDots': '拖选中行预备点（三个点）的左端', 'm.tDotsDo': '设定这一行自己的预备点时长（橙色 = 已设定），出现时间自动跟着提前；双击恢复自动',
   };
 
   D.ja = {
@@ -417,6 +439,28 @@
     'furi.done': 'ルビを {n} か所（{lines} 行）に付けました。自動ルビは間違うことがあるので、1 行ずつ確認してください。', 'furi.doneKept': 'ルビを {n} か所（{lines} 行）に付け、既存のルビ {kept} か所はそのまま残しました。自動ルビは間違うことがあるので、1 行ずつ確認してください。',
     'furi.miss': '読みを得られなかった語が {n} 個あり、そのままにしてあります。',
     'tip.syl': "音節「{s}」（{w}）", 'menu.sylSplit': "ここで音節を分ける…", 'menu.sylMerge': "前の音節と結合", 'menu.sylReset': "音節を自動に戻す", 'menu.evenSyl': "音節内の文字を均等に（この行）", 'menu.evenSylAll': "音節内の文字を均等に（すべての歌詞）", 'line.evenSyl': "音節内の文字を均等に", 'line.evenSylTip': "音節の開始はそのままで、各音節の文字を次の音節までの間に均等に割り振ります（重なった文字の修復）。単語内の複数の音節が同じ時刻に重なっている場合は、先に単語内に広げます", 'line.sylMenu': "音節：分割 / 結合", 'line.syl_html': "ラテン・キリル・ギリシャ文字は<b>音節</b>ごとにタイミングを合わせます（自動で区切ります）。「⋯」または音節の行を右クリックで分割 / 結合。歌詞テキストの文字と文字の間に <code>|</code> を書いて区切ることもできます（例：<code>Fon|taine</code>）。", 'u.syl': "音節の区切りを変更", 'u.evenSyl': "音節内の文字を均等に", 'msg.evenSyl': "{n} 行の音節内の文字を均等にしました", 'msg.evenSylNone': "調整が必要な音節はありません",
+
+    /* ---- この行だけのスタイル / 行内改行 ---- */
+    'line.brkHint': 'Shift+Enter（または \\n と入力）でこの行の中で改行し、複数段に分けて表示します。下の「この行だけのスタイル」の位置オフセットと組み合わせて調整できます。',
+    'line.gStyle': 'この行だけのスタイル', 'line.ovCount': '{n} 項目を変更',
+    'line.ovLead': 'ここでの設定はこの行にだけ効きます。変更していない項目には全体の設定（「スタイル」「レイアウト」タブ）が表示され、変更するとこの行専用の値になります（オレンジで表示）。↺ で全体の設定に戻ります。',
+    'line.ovFieldReset': '全体の設定に戻す',
+    'line.ovCopy': 'スタイルをコピー', 'line.ovCopyTip': 'この行だけのスタイルをコピー（位置は含みません）',
+    'line.ovPaste': 'スタイルを貼り付け', 'line.ovPasteTip': 'コピーしたスタイルをこの行に適用（位置はそのまま）',
+    'line.ovPara': 'この段落に適用', 'line.ovParaTip': 'この行のスタイルを同じ段落の他の行に適用（各行の位置はそのまま）',
+    'line.ovAll': 'すべての行に適用', 'line.ovAllTip': 'この行のスタイルを他のすべての行に適用（各行の位置はそのまま）',
+    'line.ovReset': 'この行を全体のスタイルに戻す', 'line.ovResetTip': 'この行だけの設定をすべて削除します（位置オフセットも含む）',
+    'line.ovPosHint': 'プレビューで Alt を押しながらこの行をドラッグすると移動できます（元の位置と画面の中心線に吸着、Shift も押すと吸着しません）。Ctrl+矢印キーで微調整。',
+    'line.gPos': '位置', 'line.gTextS': '文字', 'line.gColors': '色（歌う前 / 歌った後）', 'line.gRuby': 'ルビ', 'line.gDots': 'カウントイン',
+    'f.dx': '横オフセット (×幅)', 'f.dy': '縦オフセット (×高さ)', 'f.grow': '改行時の伸びる向き', 'f.growAuto': '自動（{d}）', 'f.growUp': '上へ', 'f.growDown': '下へ', 'f.growCenter': '基線を中心に',
+    'f.wrapGap': '行内改行の間隔', 'f.dotColors': '点の色（待機 / カウント中）', 'f.followLyric': '歌詞の塗りの色に戻す',
+    'msg.ovCopied': 'この行のスタイルをコピーしました', 'msg.ovNone': '適用できる他の行がありません', 'msg.ovApplied': '他の {n} 行にスタイルを適用しました',
+    'u.lineStyle': 'この行のスタイル変更', 'u.linePos': '行の位置の移動', 'list.ov': 'この行だけのスタイルあり', 'menu.resetPos': '位置を元に戻す',
+    'tip.pos': 'オフセット x {x} px · y {y} px', 'tip.posSnap': '吸着中 · Shift を押すと解除', 'tip.dots': 'カウントイン {d} 秒（{t} 秒から）',
+    'k.nudgePos': '選択行の表示位置を 4 ピクセル動かす', 'k.nudgePos5': '選択行の表示位置を 20 ピクセル動かす',
+    'm.pAlt': 'Alt を押しながら歌詞をドラッグ', 'm.pAltDo': 'その行の画面上の位置を動かす（「この行だけのスタイル」の位置オフセット）。元の位置と画面の中心線に吸着し、Shift も押すと吸着しません',
+    'm.pRight': '歌詞を右クリック', 'm.pRightDo': 'タイムラインと同じ右クリックメニュー（「位置を元に戻す」を含む）',
+    'm.tDots': '選択行のカウントイン（3 つの点）の左端をドラッグ', 'm.tDotsDo': 'その行だけのカウント長を設定（オレンジ = 設定済み）。表示開始は自動で早まります。ダブルクリックで自動に戻す',
   };
 
   D.en = {
@@ -624,6 +668,28 @@
     'furi.done': 'Added {n} readings in {lines} lines. Automatic readings can be wrong, so please proofread them.', 'furi.doneKept': 'Added {n} readings in {lines} lines and kept {kept} existing ones. Automatic readings can be wrong, so please proofread them.',
     'furi.miss': '{n} words got no reading and were left as they are.',
     'tip.syl': "syllable “{s}” ({w})", 'menu.sylSplit': "Split syllable here…", 'menu.sylMerge': "Merge with previous syllable", 'menu.sylReset': "Reset syllables to automatic", 'menu.evenSyl': "Even out letters within syllables", 'menu.evenSylAll': "Even out letters within syllables (all lines)", 'line.evenSyl': "Even out letters within syllables", 'line.evenSylTip': "Keeps syllable starts and spreads each syllable's letters evenly up to the next syllable (repairs letters piled onto one timestamp); syllables of a word that sit on the same instant are first spread across the word", 'line.sylMenu': "Syllable: split / merge", 'line.syl_html': "Latin, Cyrillic and Greek text is timed by <b>syllable</b> (split automatically). Use “⋯” or right-click a syllable row to split or merge; you can also type <code>|</code> between two letters in the lyric text, e.g. <code>Fon|taine</code>.", 'u.syl': "Change syllables", 'u.evenSyl': "Even out letters within syllables", 'msg.evenSyl': "Evened out the letters within syllables in {n} line(s)", 'msg.evenSylNone': "Nothing to change in the syllables",
+
+    /* ---- This line's own style (line properties) / line breaks inside a line ---- */
+    'line.brkHint': 'Shift+Enter (or typing \\n) breaks this line into several rows. Combine it with the position offset under "This line\'s own style" below to fine-tune the layout.',
+    'line.gStyle': 'This line\'s own style', 'line.ovCount': '{n} changed',
+    'line.ovLead': 'Settings here affect only this line. Fields you have not changed show the global setting (Style / Layout tabs); once you change one it becomes this line\'s own value (marked orange). ↺ goes back to the global setting.',
+    'line.ovFieldReset': 'Use the global setting',
+    'line.ovCopy': 'Copy style', 'line.ovCopyTip': 'Copy this line\'s own style (without its position)',
+    'line.ovPaste': 'Paste style', 'line.ovPasteTip': 'Apply the copied style to this line (its position stays)',
+    'line.ovPara': 'Apply to paragraph', 'line.ovParaTip': 'Apply this line\'s style to the other lines of its paragraph (their positions stay)',
+    'line.ovAll': 'Apply to all lines', 'line.ovAllTip': 'Apply this line\'s style to every other line (their positions stay)',
+    'line.ovReset': 'Reset this line to the global style', 'line.ovResetTip': 'Remove everything this line sets for itself, including its position offset',
+    'line.ovPosHint': 'In the preview, hold Alt and drag this line to move it (it snaps to its original place and to the center lines of the picture; hold Shift as well to move freely). Ctrl+arrow keys nudge it.',
+    'line.gPos': 'Position', 'line.gTextS': 'Text', 'line.gColors': 'Colors (unsung / sung)', 'line.gRuby': 'Furigana', 'line.gDots': 'Count-in',
+    'f.dx': 'Offset → (× width)', 'f.dy': 'Offset ↓ (× height)', 'f.grow': 'Wrapped rows grow', 'f.growAuto': 'Auto ({d})', 'f.growUp': 'upward', 'f.growDown': 'downward', 'f.growCenter': 'centered on the baseline',
+    'f.wrapGap': 'Spacing of wrapped rows', 'f.dotColors': 'Dot colors (waiting / counting)', 'f.followLyric': 'Follow the lyric fill colors again',
+    'msg.ovCopied': 'Copied this line\'s style', 'msg.ovNone': 'There are no other lines to apply it to', 'msg.ovApplied': 'Applied the style to {n} other lines',
+    'u.lineStyle': 'Change line style', 'u.linePos': 'Move line position', 'list.ov': 'This line has its own style', 'menu.resetPos': 'Reset position',
+    'tip.pos': 'Offset x {x} px · y {y} px', 'tip.posSnap': 'Snapped · hold Shift to move freely', 'tip.dots': 'Count-in {d} s (from {t} s)',
+    'k.nudgePos': 'Move the selected line on screen by 4 px', 'k.nudgePos5': 'Move the selected line on screen by 20 px',
+    'm.pAlt': 'Alt+drag lyrics', 'm.pAltDo': 'Move that line on screen (the position offset in "This line\'s own style"); snaps to its original place and to the center lines, hold Shift as well to move freely',
+    'm.pRight': 'Right-click lyrics', 'm.pRightDo': 'Same menu as on the timeline (including Reset position)',
+    'm.tDots': 'Drag the left end of the selected line\'s count-in dots', 'm.tDotsDo': 'Set this line\'s own count-in length (orange = set); its appear time moves earlier automatically. Double-click to reset to automatic',
   };
 
   K.I18N = D;

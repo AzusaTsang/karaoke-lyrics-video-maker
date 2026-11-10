@@ -44,14 +44,21 @@
     parts.forEach((p) => { if (HAS_KANJI.test(p)) specs.push({ t: p, r: m[g++] }); else Array.from(p).forEach((c) => specs.push({ t: c, r: null })); });
     return { specs, miss: 0 };
   };
-  /* 整行文字 → { specs: [{a, b, t, r}], miss }（a, b = 按字符计的起止位置）；分词结果和原文对不上时返回 null */
-  F.plan = (text) => {
-    const toks = F.tokenizer.tokenize(text);
-    if (toks.map((t) => t.surface_form).join('') !== text) return null;
-    const specs = []; let pos = 0, miss = 0;
-    toks.forEach((tk) => { const r = F.tokenSpecs(tk.surface_form, tk.reading); miss += r.miss; r.specs.forEach((sp) => { const n = len(sp.t); specs.push({ a: pos, b: pos + n, t: sp.t, r: sp.r }); pos += n; }); });
+  /* 整行文字 → { specs: [{a, b, t, r}], miss }（a, b = 按字符计的起止位置）；分词结果和原文对不上时返回 null。
+     cuts = 行内换行所在的字符位置：每一排单独分词，单元（注音）不会跨过换行 */
+  F.plan = (text, cuts) => {
+    const chars = Array.from(text), pts = [0].concat((cuts || []).filter((c) => c > 0 && c < chars.length), [chars.length]), specs = []; let miss = 0;
+    for (let x = 0; x + 1 < pts.length; x++) {
+      const seg = chars.slice(pts[x], pts[x + 1]).join(''); if (!seg) continue;
+      const toks = F.tokenizer.tokenize(seg);
+      if (toks.map((t) => t.surface_form).join('') !== seg) return null;
+      let pos = pts[x];
+      toks.forEach((tk) => { const r = F.tokenSpecs(tk.surface_form, tk.reading); miss += r.miss; r.specs.forEach((sp) => { const n = len(sp.t); specs.push({ a: pos, b: pos + n, t: sp.t, r: sp.r }); pos += n; }); });
+    }
     return { specs, miss };
   };
+  /* 一行里行内换行的字符位置 */
+  F.cuts = (l) => { const c = []; let pos = 0; l.units.forEach((u, i) => { if (u.n && i) c.push(pos); pos += len(u.t); }); return c; };
 
   /* 把注音套到一行上，尽量保留时间：
      · 已有注音的单元原样保留（overwrite 时才重新注音）；新单元的开始时间取它第一个字原来所在单元的开始时间
@@ -73,6 +80,7 @@
       const nx = j + 1 < old.length ? old[j + 1].s : l.end, same = it.a === la && it.b === la + n && (jo.r || null) === (it.r || null);
       const u = { t: it.t, r: it.r, s: K.r3(it.a > la ? jo.s + ((nx - jo.s) * (it.a - la)) / n : jo.s) };
       if (same && jo.m) u.m = jo.m.slice();
+      if (jo.n && it.a === la) u.n = 1;                              // 行内换行跟着那一排的第一个字走
       if (it.r && !same) added++;
       out.push(u); p = it.b;
     });
@@ -85,7 +93,7 @@
     lines.forEach((l) => {
       const text = K.lineText(l); if (!HAS_KANJI.test(text)) return;
       r.kanji++; if (!overwrite) r.kept += l.units.filter((u) => u.r).length;
-      const pl = F.plan(text); if (!pl) { r.miss++; return; }
+      const pl = F.plan(text, F.cuts(l)); if (!pl) { r.miss++; return; }
       r.miss += pl.miss; const a = F.applyToLine(l, pl, overwrite); if (a.added) { r.added += a.added; r.lines++; }
     });
     if (r.added) K.commit('furi');

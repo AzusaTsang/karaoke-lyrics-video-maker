@@ -25,8 +25,11 @@
     sc.ord.forEach((x) => { const J = sc.info.get(x.id); if (J.show < I.hide && J.hide > I.show) used.add(J.row); });
     let row = 0; while (used.has(row)) row++;
     const n = K.newLine({ units: JSON.parse(JSON.stringify(l.units)), end: l.end, row, newPara: false });
+    copyOv(l, n);
     K.project.lines.push(n); K.commit('dup'); K.select(n.id); return n;
   };
+  /* 行属性（局部样式 / 位置）跟着复制：和声行、拆分出来的后半行 */
+  const copyOv = (from, to) => { if (K.hasOv(from)) to.o = JSON.parse(JSON.stringify(from.o)); };
   /* 在时间 t 处把一行拆成两行 */
   /* 拆分处的空白字直接丢掉：新行不以空白开头，前一行也不以空白结尾；其余时间原样保留（本来就单调） */
   ops.split = (l, t) => {
@@ -38,6 +41,7 @@
     while (b < l.units.length && blank(l.units[b])) b++;
     if (a === 0 || b === l.units.length) return null;          // 一侧只剩空白，不拆
     const n = K.newLine({ units: l.units.slice(b), end: l.end, row: null });
+    copyOv(l, n); delete n.units[0].n;                        // 正好在行内换行处拆分：新行的第一排不再需要换行标记
     l.units = l.units.slice(0, a);
     l.end = Math.min(l.end, Math.max(t, l.units[l.units.length - 1].s + 0.05));
     K.fixLine(l); K.fixLine(n);
@@ -51,6 +55,19 @@
     K.project.lines = K.project.lines.filter((x) => x !== nx);
     K.fixLine(l); K.commit('merge');
   };
+  /* ---------- 行属性 ----------
+     位置：dx / dy 是画布宽 / 高的比例。复制 / 粘贴 / 应用到其他行只带样式（LSTYLE），不带位置（LPOS），目标行的位置保持不变 */
+  const r5 = (v) => Math.round(v * 1e5) / 1e5;
+  ops.nudgePos = (l, ddx, ddy) => { const S = K.S(), E = K.LS(l); K.setOv(l, 'dx', r5((E.dx || 0) + ddx / S.W)); K.setOv(l, 'dy', r5((E.dy || 0) + ddy / S.H)); K.commit('linePos'); };
+  ops.resetPos = (l) => { K.setOv(l, 'dx', null); K.setOv(l, 'dy', null); K.commit('linePos'); };
+  ops.styleOf = (l) => { const o = {}; K.LSTYLE.forEach((k) => { if (l.o && k in l.o) o[k] = l.o[k]; }); return o; };
+  /* 把样式 st（只含 LSTYLE 的键）套到几行上，原来的样式覆盖换掉、位置保留；一步撤销。返回改了几行 */
+  ops.applyStyle = (lines, st) => {
+    lines.forEach((l) => { const pos = {}; K.LPOS.forEach((k) => { if (l.o && k in l.o) pos[k] = l.o[k]; }); const c = K.cleanOverrides(Object.assign({}, st, pos)); if (c) l.o = c; else delete l.o; });
+    if (lines.length) K.commit('lineStyle');
+    return lines.length;
+  };
+  ops.clearStyle = (l) => { if (!K.hasOv(l)) return; delete l.o; K.commit('lineStyle'); };
   const SET_WHY = { newPara: 'para', dots: 'dots', row: 'row', align: 'align', showAt: 'showHide', hideAt: 'showHide' };
   ops.set = (l, k, v) => { l[k] = v; K.commit(SET_WHY[k] || 'settings'); };
   /* 手动音节：在字母 i 处分开（v = 1）/ 和前一个音节合并（v = 0）。和自动结果相同时不留覆盖 */

@@ -18,9 +18,10 @@ No installation and no build step: open `index.html` in Chrome or Edge, or host 
 - Per-character wipe, with long notes sliding smoothly to the next character
 - Furigana (ruby) written as `漢字{かんじ}`, centred over the kanji it belongs to
 - Timing by kana beat (mora) for characters that carry furigana
+- Latin, Cyrillic and Greek lyrics are timed by syllable (split automatically, correctable per line); letters inside a syllable follow it proportionally
 - Multi-row layout: lines take turns on alternating row slots, plus harmony rows that sing at the same time
 - Automatic paragraphs and a three-dot count-in before each paragraph
-- Timeline editor: move lines, retime single characters, set when a line appears and disappears
+- Timeline editor: move lines, retime single characters or syllables, set when a line appears and disappears
 - Draggable wipe cursor in the preview: pause, then drag it to where the singer actually is
 - Tap-to-time with `T` while the media plays
 - Timing helpers: playback speed 0.5× / 0.75× / 1× / 1.25× (media keeps its pitch), loop the selected line, play from the line start, volume and mute
@@ -28,7 +29,7 @@ No installation and no build step: open `index.html` in Chrome or Edge, or host 
 - Undo / redo (150 steps; the buttons tell you what will be undone), project files (`.kara.json`), and a browser autosave as a safety net, with a save-status indicator
 - A welcome guide on the first visit, a help dialog listing every shortcut and mouse action (`?` or `F1`), and an empty-project screen with the same starting points
 - Paste or type lyrics (one line per row, blank line = paragraph break, `漢字{かんじ}` furigana accepted); they are laid out and ready for tap-timing
-- Import SRT, LRC (including enhanced, per-character LRC), or a per-character aligned JSON (see [forced alignment](#optional-forced-alignment))
+- Import SRT, LRC (including enhanced per-character / per-syllable LRC), or a per-character aligned JSON (see [forced alignment](#optional-forced-alignment))
 - Auto furigana: kuromoji adds readings above kanji in the browser (the dictionary is downloaded only when you ask for it, after a confirmation)
 - Export: transparent PNG sequence (to a folder, or as ZIP download in any browser), single frame PNG, a clean "screen recording" view, and lyrics files (LRC / SRT / ASS karaoke)
 - Interface language switcher (中文 / 日本語 / English)
@@ -53,16 +54,16 @@ Press `?` or `F1` (or the **?** button) in the app for the same tables. The keyb
 | Where | Action | Effect |
 | --- | --- | --- |
 | Preview | Click lyrics | Select that line |
-| Preview | Drag the **wipe cursor** (vertical bar with a dot), tool *Drag: Retime* | Pause at a moment, drag the cursor to the character being sung right now: the nearest character (or kana beat) starts at the current time. Characters that get pushed along are marked orange while you drag |
+| Preview | Drag the **wipe cursor** (vertical bar with a dot), tool *Drag: Retime* | Pause at a moment, drag the cursor to the character being sung right now: the nearest character or syllable (or kana beat) starts at the current time. Boundaries that get pushed along are marked orange while you drag; letters inside a syllable follow proportionally |
 | Preview | Drag the wipe cursor, tool *Drag: Scrub* | Moves the playback position back and forth along this line |
 | Preview | Double-click lyrics | Jump to the start of that line |
 | Timeline | Click / drag the ruler | Seek |
 | Timeline | Drag the solid part of a block | Move the whole line; drag it up or down to another track to change its row |
-| Timeline | Drag a small tick in the lower half of the selected block | Adjust one character's start time (yellow ticks: one kana beat) |
+| Timeline | Drag a small tick in the lower half of the selected block | Adjust the start of one character or syllable (yellow ticks: one kana beat). Right-click a syllable tick to split or merge syllables |
 | Timeline | Drag the right edge of the solid block | Adjust the line's end time |
 | Timeline | Drag the left / right thin edge of the pale window | When the line appears / disappears (orange = set by hand) |
 | Timeline | Double-click a block / a thin edge | Jump to the line start / reset the appear or disappear time to automatic |
-| Timeline | Right-click a block or empty space | Paragraph break, count-in dots, row, harmony line, split, merge, delete / add line |
+| Timeline | Right-click a block or empty space | Paragraph break, count-in dots, row, harmony line, split, merge, *Even out letters within syllables*, delete / add line |
 | Timeline | Wheel / `Ctrl`+wheel | Scroll / zoom |
 | Timeline | Middle-drag, or drag empty space | Pan |
 | Timeline | Hold `Shift` while dragging | Don't snap to the playhead (otherwise edits snap to it within 6 px) |
@@ -71,7 +72,7 @@ Press `?` or `F1` (or the **?** button) in the app for the same tables. The keyb
 | Lyrics list | Click / double-click / right-click a line | Select / jump to its start / same menu as on the timeline |
 | Anywhere | Drop files onto the window | Open a project, SRT or LRC, or load audio / video (several files are processed one after another) |
 
-While you drag on the timeline or in the preview, a small tooltip shows the value being changed (time to the millisecond, the character or kana beat, the row).
+While you drag on the timeline or in the preview, a small tooltip shows the value being changed (time to the millisecond, the character, syllable or kana beat, the row).
 
 ### Keyboard
 
@@ -85,7 +86,7 @@ While you drag on the timeline or in the preview, a small tooltip shows the valu
 | `,` `.` | Step one frame |
 | `Shift+,` `Shift+.` | Slower / faster (0.5× – 1.25×) |
 | `↑` `↓` | Select previous / next line |
-| `T` | Tap-to-time. While playing, each press sets the start time of the selected line's next character (kana beat by beat for characters with furigana); the final press ends the line and moves to the next one |
+| `T` | Tap-to-time. While playing, each press sets the start time of the selected line's next character (syllable by syllable for Latin, Cyrillic and Greek text, kana beat by beat for characters with furigana); the final press ends the line and moves to the next one |
 | `[` `]` | Shift the whole line by -20 ms / +20 ms (`Shift`: 100 ms) |
 | `P` | Paragraph break here on / off |
 | `D` | Cycle count-in dots (auto → show → hide) |
@@ -115,7 +116,7 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 - *Add*: *after the existing lyrics*, or *replace all lyrics (undoable)*.
 - *Start at*: *the playhead*, *0:00*, or *after the last line* (only when adding after the existing lyrics).
 - *Seconds per line* (default 3): the lines are laid out back to back and each line's characters are spread evenly over its time, like *Even split*. *Gap at paragraphs (s)* (default 4) is extra time left at blank lines, which leaves room for the count-in dots.
-- After *Add lyrics* the first new line is selected and a message tells you to press Space and tap `T` on each character as you hear it. The whole operation is **one undo step**.
+- After *Add lyrics* the first new line is selected and a message tells you to press Space and tap `T` on each character (or syllable) as you hear it. The whole operation is **one undo step**.
 
 ## Display rules
 
@@ -125,6 +126,8 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 - **Furigana.** Write readings in the lyric text as `漢字{かんじ}`. When you edit the text, characters before and after the change keep their timing.
 - **Auto furigana.** Use *Furigana…* in the header of the lyrics list, *Auto furigana…* in the *Line* tab, or *Auto furigana (this line)…* / *Auto furigana (all lines)…* in the right-click menu. The dialog lets you pick *Only the selected line* or *All lyrics*, and whether to *Also replace existing furigana* (off by default: readings you already wrote and all timing stay). A run of kanji becomes one unit carrying its hiragana reading; for words that mix kanji and kana such as 受け入れ the reading is split by anchoring on the kana, so each kanji block gets only its own reading (受{う}け入{い}れ). The whole operation is one undo step and a message tells you how many readings were added. **Automatic readings are often wrong in lyrics** (names, archaic or special readings such as 征く, wrong word splits): proofread every line.
 - **Timing by kana beat.** A character with furigana is split into the beats of its reading (small kana join the previous beat). The cursor, the yellow ticks on the timeline, tap-to-time and the table on the right can all adjust each beat; beats you have not touched are spread evenly inside the character.
+- **Timing by syllable (Latin, Cyrillic, Greek).** In alphabetic text you time syllables, not letters: the wipe cursor snaps to syllable starts, the timeline shows one tick per syllable (a shorter tick inside a word), `T` taps one syllable per press, and the table in the *Line* tab has one row per syllable. Words are split automatically at vowel groups: one consonant between two vowel groups goes to the next syllable; of several consonants the last one does, except pairs that stay together (consonant + `l` / `r`, `ch`, `ph`, `th`, `sh`, `gn`, `qu`, …); a hyphen ends a syllable and an apostrophe stays with the letters before it; a word without a vowel is one syllable, and a run of digits is one group. For example *fon·tai·ne*, *Hy·dro*, *ко·ро·ле·ва*. It is only a first guess (silent letters, the French mute *e*, a syllable held over several notes): right-click a syllable tick on the timeline or a syllable row in the table (or use the row's **⋯** button) and choose *Split syllable here…* (then the letter), *Merge with previous syllable* or *Reset syllables to automatic*. Each is one undo step and is saved in the project. In the lyric text you can also type `|` between two letters, e.g. `Fon|taine`. When a syllable start moves, the letters inside the neighbouring syllables, and the spaces and punctuation after a word, are moved proportionally instead of piling up on one timestamp; syllables (or characters) pushed along by a drag keep at least 30 ms each while the line has room.
+- **Repairing older projects.** Projects edited before syllable timing may have letters stacked on one timestamp, so the wipe jumps over them. *Even out letters within syllables* (*Line* tab, or the right-click menu, also as *Even out letters within syllables (all lines)*) spreads the letters of each syllable evenly between its start and the next syllable without moving syllable starts; syllables of a word that sit on the same instant are spread across the word first. It is one undo step. Opening a project never changes its timing by itself.
 - **Wipe speed.** Each character is wiped from its own start until the next character starts (the last character until the line's end), so a long note slides across slowly. To make a long note stop and hold, drag the next character or the line end to where it really is.
 
 ## Exporting
@@ -135,7 +138,7 @@ The bar under the preview has the play button, the time, the *Silent clock* badg
 
 **Lyrics files.** The *Lyrics files* section of the *Export* tab. Times include the Layout tab's *Global offset*.
 
-- *LRC (per character)*: enhanced LRC with a `<mm:ss.xx>` tag before every character, `[mm:ss.xx]` at the start of the line and a closing tag for the line's end. *LRC (per line)*: plain LRC with one timestamp per line.
+- *LRC (per character / syllable)*: enhanced LRC with a `<mm:ss.xx>` tag before every character (before every syllable in Latin, Cyrillic and Greek text; when imported, letters without their own tag are spread evenly between the tags), `[mm:ss.xx]` at the start of the line and a closing tag for the line's end. *LRC (per line)*: plain LRC with one timestamp per line.
 - *SRT*: one cue per lyric line, from the line start to its end.
 - *ASS karaoke*: one Dialogue per line with a `\kf<centiseconds>` wipe tag per character. The header has `[Script Info]` and `[V4+ Styles]`; the play resolution is the canvas size, the font is the first family name, and colors are converted to `&HBBGGRR` (unsung / swept = the two lyric fill colors, outline = the unsung outline color). On-screen position is approximated from row and alignment.
 - Furigana cannot be represented in these formats and is left out; the ASS look is approximate, so check it in your player.
@@ -204,7 +207,7 @@ Before publishing, fill in two placeholders:
 bash tests/run.sh
 ```
 
-It opens the app in headless Chrome, simulates interactions (first-run welcome, dragging the wipe cursor and timeline handles, every keyboard shortcut against the help table, speed and loop, the in-app dialogs, file drops, language switching, malicious project files, pasting lyrics, LRC import and export round trips, SRT / ASS export, auto furigana with a stubbed tokenizer, the ZIP writer, …) and prints `PASS: <n> checks`, or `FAIL: …` followed by the failed checks as JSON; the exit code is non-zero on failure. Set `VERBOSE=1` to see the details of a passing run too. The test runs under Chrome's virtual-time budget (default 300000 ms, override with the `BUDGET` environment variable), and the auto-furigana tests **do not touch the network**. The script looks for Chrome at the default Windows path; set the `CHROME` environment variable to point at another Chrome / Chromium binary (for example on Linux or macOS).
+It opens the app in headless Chrome, simulates interactions (first-run welcome, dragging the wipe cursor and timeline handles, every keyboard shortcut against the help table, speed and loop, the in-app dialogs, file drops, language switching, malicious project files, pasting lyrics, syllable timing, LRC import and export round trips, SRT / ASS export, auto furigana with a stubbed tokenizer, the ZIP writer, …) and prints `PASS: <n> checks`, or `FAIL: …` followed by the failed checks as JSON; the exit code is non-zero on failure. Set `VERBOSE=1` to see the details of a passing run too. The test runs under Chrome's virtual-time budget (default 300000 ms, override with the `BUDGET` environment variable), and the auto-furigana tests **do not touch the network**. The script looks for Chrome at the default Windows path; set the `CHROME` environment variable to point at another Chrome / Chromium binary (for example on Linux or macOS).
 
 ## Third-party / content notice
 

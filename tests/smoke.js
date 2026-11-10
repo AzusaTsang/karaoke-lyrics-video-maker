@@ -470,7 +470,8 @@ window.addEventListener('load', async () => {
         const back = K.normalizeProject(K.parseLrc(K.exportLrcText(true))).lines; let worst = 0, bad = null;
         if (back.length !== src.length) bad = 'count ' + back.length + '/' + src.length;
         else src.forEach((x, i) => {
-          const sc = []; x.units.forEach((q) => Array.from(q.t).forEach((ch, ci) => sc.push([ch, ci ? null : Math.max(0, q.s + O)]))); const bc = back[i].units.map((q) => [q.t, q.s]);
+          // 增强 LRC 每组（字母音节 / 其余的字）一个标签：只比较组开头的时间；音节里其余字母读回时在标签之间插值
+          const gs = new Set(K.groups(x).map((g) => g.i)), sc = []; x.units.forEach((q, ui) => Array.from(q.t).forEach((ch, ci) => sc.push([ch, ci || !gs.has(ui) ? null : Math.max(0, q.s + O)]))); const bc = back[i].units.map((q) => [q.t, q.s]);
           const trim = (a) => { a = a.slice(); while (a.length && !a[0][0].trim()) a.shift(); while (a.length && !a[a.length - 1][0].trim()) a.pop(); return a; };
           const A2 = trim(sc), B2 = trim(bc);
           if (A2.map((q) => q[0]).join('') !== B2.map((q) => q[0]).join('')) { bad = bad || 'text ' + i + ' ' + JSON.stringify([A2.map((q) => q[0]).join(''), B2.map((q) => q[0]).join('')]); return; }
@@ -478,6 +479,8 @@ window.addEventListener('load', async () => {
           worst = Math.max(worst, Math.abs(Math.max(0, x.end + O) - back[i].end));
         });
         ok('lrcRoundTrip:' + si, !bad && worst <= 0.01, { bad, worst, lines: src.length });
+        ok('lrcTagPerGroup:' + si, K.exportLrcText(true).split('\n').filter((x) => /^\[\d/.test(x)).every((x, i) => (x.match(/<\d/g) || []).length === K.groups(src[i]).length + 1));
+        ok('lrcReimportStable:' + si, back.every((x, i) => (src[i].units.some((u) => u.r) || K.bounds(x).length === K.bounds(src[i]).length) && x.units.every((u, k, a) => !k || u.s >= a[k - 1].s)));
         // SRT：一行一条，起止 = 行的开始 / 结束；能被应用自己的 SRT 导入读回
         const srt = K.exportSrtText(), cues = K.parseSrt(srt);
         ok('srtShape:' + si, /^1\n\d\d:\d\d:\d\d,\d{3} --> \d\d:\d\d:\d\d,\d{3}\n.+/.test(srt) && cues.length === src.length && new RegExp('\\n\\n' + src.length + '\\n').test(srt), srt.slice(0, 120));
@@ -615,6 +618,170 @@ window.addEventListener('load', async () => {
         ok('zipExportMessage', document.getElementById('expMsg').textContent === K.t('exp.doneZip', { n: 5, w: K.S().W, h: K.S().H, fps: 24, t0: 28, z: 1 }), document.getElementById('expMsg').textContent); }
       K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false;
     }
+
+    // ---- T. 字母按音节定时：分组 / 边界 / 按比例重排 / 硬推最小间隔 / 修复 / 手动音节 / 日语不变 ----
+    { const mkL = (txt, s, e) => { const l = K.newLine({ units: K.parseText(txt), end: e }); K.evenSplit(l, s, e); K.fixLine(l); return l; };
+      const syl = (l) => K.groups(l).map((g) => (g.w ? K.gText(l, g) + (g.e > g.c ? '[' + l.units.slice(g.c, g.e).map((u) => u.t).join('') + ']' : '') : '<' + l.units[g.i].t + '>')).join('|');
+      const P = (txt) => syl(mkL(txt, 0, 10));
+      const starts = (l) => K.groups(l).map((g) => l.units[g.i].s);
+      const sound = (u) => /[^\s\p{P}]/u.test(u.t);
+      /* 同一个词里有发音的字母时间互不相同（词的区间够用时）、整行单调 */
+      const tidy = (l) => { const bad = []; let p = -1;
+        l.units.forEach((u, i) => { if (u.s < p - 1e-9) bad.push(['mono', i]); p = u.s; });
+        const G = K.groups(l); for (let a = 0; a < G.length; a++) { if (!G[a].w || !G[a].f) continue; let z = a + 1; while (z < G.length && G[z].w && !G[z].f) z++;
+          const ts = []; for (let y = G[a].i; y < G[z - 1].c; y++) if (sound(l.units[y])) ts.push(l.units[y].s);
+          const N = z < G.length ? l.units[G[z].i].s : l.end;
+          if (N - ts[0] > 0.002 * ts.length && new Set(ts).size !== ts.length) bad.push(['tie', K.gText(l, G[a]), ts]); }
+        return bad; };
+      out.syl = {};
+      const cases = { "L'eau s'élève, ô reine!": "L'eau[ ]|s'é|lè|ve[, ]|ô[ ]|rei|ne[!]", fontaine: 'fon|tai|ne', Hydro: 'Hy|dro', karaoke: 'ka|rao|ke', strength: 'strength', rhythm: 'rhythm', 'королева': 'ко|ро|ле|ва',
+        '愛してるbaby': '<愛>|<し>|<て>|<る>|ba|by', "jusqu'à": "jus|qu'à", 'Louez-la !': 'Louez-|la[ !]', royale: 'ro|ya|le', 'MP3 2026年': 'MP3[ ]|2026|<年>' };
+      Object.keys(cases).forEach((w) => { out.syl[w] = P(w); ok('sylPartition:' + w, out.syl[w] === cases[w], [w, out.syl[w]]); });
+      // 带注音的汉字 / 假名不变：一个字一组，按拍定时
+      { const l = mkL('王道{おうどう}をGo', 0, 4), B = K.bounds(l);
+        ok('sylRubyKanjiUntouched', syl(l) === '<王道>|<を>|Go' && B.length === 4 + 1 + 1 && B.slice(0, 4).every((b, j) => b.i === 0 && b.j === j), [syl(l), B]); }
+      { const l = mkL("L'eau s'élève, ô reine!", 0, 5); ok('sylBoundsCount', K.bounds(l).length === 7 && K.bounds(l).every((b) => !b.j), K.bounds(l).length); }
+      // ---- 舞台 / 时间线拖动：法语示例 ----
+      K.setProject(K.normalizeProject(K.SAMPLES[1].project)); await K.ensureFont(); await wait(60);
+      const fl = K.screen().ord[2], fid = fl.id; K.select(fid);
+      out.frLine = { text: K.lineText(fl), syl: syl(fl) };
+      ok('frBoundsPerSyllable', K.bounds(fl).length === K.groups(fl).length && K.bounds(fl).length < fl.units.length / 2, [K.bounds(fl).length, fl.units.length]);
+      ok('frSampleTidyBefore', !tidy(fl).length, tidy(fl));
+      /* 舞台：不推挤的拖动 —— 只有目标音节开头变，前一个音节和这个音节里的字母按比例跟着走 */
+      { const B = K.bounds(fl), bi = 3, b = B[bi], t0 = K.boundTime(fl, B[bi - 1]), t1 = K.boundTime(fl, b), t2 = K.boundTime(fl, B[bi + 1]), T1 = K.r3(t1 + (t2 - t1) * 0.4);
+        const G = K.groups(fl), gp = G[bi - 1], gc = G[bi], rel = (l, g, S, N) => l.units.slice(g.i + 1, g.e).map((u) => (u.s - S) / (N - S));
+        const r0p = rel(fl, gp, t0, t1), r0c = rel(fl, gc, t1, t2), before = starts(fl);
+        K.seek(T1 + K.S().offset); await wait(40);
+        const I = K.screen().info.get(fid), Gm = K.geo(fl, I, cv.width, cv.height), rc = cv.getBoundingClientRect(), cx = (X) => rc.left + X * rc.width / cv.width, cy = rc.top + (Gm.y - K.S().size * 0.4) * rc.height / cv.height;
+        ev(cv, 'pointerdown', cx(Gm.x0 + K.progressEdge(fl, Gm.L, T1) * Gm.s), cy); ev(cv, 'pointermove', cx(Gm.x0 + Gm.L.units[b.i].x * Gm.s + 1), cy); ev(cv, 'pointerup', cx(Gm.x0 + Gm.L.units[b.i].x * Gm.s + 1), cy);
+        const L1 = K.line(fid), after = starts(L1), r1p = rel(L1, gp, t0, T1), r1c = rel(L1, gc, T1, t2);
+        out.stageSyl = { syl: K.gText(fl, gc), t1, T1, before: before.slice(bi - 1, bi + 2), after: after.slice(bi - 1, bi + 2) };
+        ok('stageSylRetime', near(after[bi], T1) && after.every((v, i) => i === bi || near(v, before[i])) && K.undoWhy() === 'retime', out.stageSyl);
+        ok('stageSylProportional', r0p.length && r0c.length && r0p.every((v, i) => near(v, r1p[i], 0.03)) && r0c.every((v, i) => near(v, r1c[i], 0.03)), [r0p, r1p, r0c, r1c]);
+        ok('stageSylTidy', !tidy(L1).length, tidy(L1));
+        /* 舞台：推挤 —— 把当前时间钉到后面两个音节之后的音节上，被越过的音节开头之间至少隔 30 ms */
+        K.undo(); const L2 = K.line(fid), B2 = K.bounds(L2), T2 = K.r3(K.boundTime(L2, B2[bi + 3]) + 0.01), b0 = starts(L2);
+        K.seek(T2 + K.S().offset); await wait(40);
+        const G2 = K.geo(L2, K.screen().info.get(fid), cv.width, cv.height), xb = cx(G2.x0 + G2.L.units[B2[bi].i].x * G2.s + 1);
+        ev(cv, 'pointerdown', cx(G2.x0 + K.progressEdge(L2, G2.L, T2) * G2.s), cy); ev(cv, 'pointermove', xb, cy);
+        const tip = document.getElementById('tip').textContent; ev(cv, 'pointerup', xb, cy);
+        const s2 = starts(K.line(fid)), gaps = s2.slice(1).map((v, i) => +(v - s2[i]).toFixed(3)), moved = s2.map((v, i) => (i !== bi && !near(v, b0[i]) ? i : -1)).filter((i) => i >= 0);
+        out.stagePush = { T2, starts: s2.slice(bi, bi + 6), moved, tip };
+        ok('stagePushMinGap', near(s2[bi], T2) && moved.length >= 3 && moved.every((i, k) => i === bi + 1 + k && near(s2[i] - s2[i - 1], 0.03, 1.5e-3)) && gaps.every((v) => v > 0), out.stagePush);
+        ok('stagePushTooltip', tip.includes(K.t('tip.pushed', { n: moved.length })) && tip.includes('·'), tip);
+        ok('stagePushTidy', !tidy(K.line(fid)).length, tidy(K.line(fid)));
+        K.undo(); }
+      /* 时间线：拖音节刻度（夹在左右两个音节之间，不推挤），提示里有音节和整个词 */
+      { K.tl.pps = 800; const L = K.line(fid), B = K.bounds(L), bi = 2, tb = K.boundTime(L, B[bi]); K.tl.scroll = tb + K.S().offset - 0.5; K.seek(tb + K.S().offset + 0.3); await wait(60);
+        const r = tlc.getBoundingClientRect(), TX = (t) => r.left + K.tl.gut + (t + K.S().offset - K.tl.scroll) * 800, y = r.top + 22 + K.screen().info.get(fid).row * 46 + 36, before = starts(L);
+        ev(tlc, 'pointerdown', TX(tb), y); ev(tlc, 'pointermove', TX(tb) + 8, y);
+        const tip = document.getElementById('tip').textContent; ev(tlc, 'pointerup', TX(tb) + 8, y);
+        const after = starts(K.line(fid));
+        out.tlSyl = { tb, now: after[bi], tip };
+        ok('tlSylTick', near(after[bi] - tb, 0.01, 1.5e-3) && after.every((v, i) => i === bi || near(v, before[i])) && K.undoWhy() === 'timing', out.tlSyl);
+        ok('tlSylTip', tip.includes(K.gText(L, K.groups(L)[bi])) && tip.includes('·'), tip);
+        ok('tlSylTidy', !tidy(K.line(fid)).length, tidy(K.line(fid)));
+        // 右键刻度：音节菜单在最前面
+        tlc.dispatchEvent(new MouseEvent('contextmenu', { clientX: TX(after[bi]), clientY: y, bubbles: true, cancelable: true }));
+        const mb = [...document.querySelectorAll('#menu button')].map((b) => b.textContent);
+        ok('tlTickMenuHasSyllable', !document.getElementById('menu').hidden && mb[0] === K.t('menu.sylSplit') && mb.includes(K.t('menu.sylMerge')) && mb.includes(K.t('menu.evenSyl')) && mb.includes(K.t('menu.evenSylAll')), mb);
+        document.getElementById('menu').hidden = true; K.undo(); K.tl.pps = 80; }
+      /* 打点 T：一次一个音节（空格、标点自动带过） */
+      { const L = K.line(fid), B = K.bounds(L), t0 = K.ls(L); K.select(fid); K.ui.tapIdx = 0;
+        K.ops.tap(K.r3(t0 + 0.01)); K.ops.tap(K.r3(t0 + 0.2)); K.ops.tap(K.r3(t0 + 0.35));
+        const L2 = K.line(fid), s2 = starts(L2);
+        out.tapSyl = { idx: K.ui.tapIdx, s: s2.slice(0, 4), syl: K.groups(L2).slice(0, 3).map((g) => K.gText(L2, g)) };
+        ok('tapPerSyllable', K.ui.tapIdx === 3 && near(s2[0], t0 + 0.01) && near(s2[1], t0 + 0.2) && near(s2[2], t0 + 0.35) && B.length === K.bounds(L2).length, out.tapSyl);
+        ok('tapSylTidy', !tidy(L2).length, tidy(L2));
+        K.undo(); K.undo(); K.undo(); }
+      /* 行面板：一个音节一行，字段是整个音节；右键音节行 → 拆分 → 选字母，一步撤销 */
+      { K.showTab('line'); await wait(60); const L = K.line(fid), rows = [...document.querySelectorAll('#tab-line tbody tr')], G = K.groups(L);
+        ok('lineTabRowPerSyllable', rows.length === G.length && rows.every((tr, i) => tr.cells[0].textContent.replace('·', '') === K.gText(L, G[i])), rows.map((r) => r.cells[0].textContent));
+        const gi = G.findIndex((g) => g.c - g.i >= 3), tr = rows[gi];
+        tr.dispatchEvent(new MouseEvent('contextmenu', { clientX: 300, clientY: 300, bubbles: true, cancelable: true }));
+        let mb = [...document.querySelectorAll('#menu button')]; ok('lineTabSylMenu', mb[0] && mb[0].textContent === K.t('menu.sylSplit'), mb.map((b) => b.textContent));
+        mb[0].click(); mb = [...document.querySelectorAll('#menu button')];
+        const want = K.gText(L, G[gi]).slice(0, 1) + ' | ' + K.gText(L, G[gi]).slice(1);
+        ok('lineTabSylSplitChoices', !document.getElementById('menu').hidden && mb.length === G[gi].c - G[gi].i - 1 && mb[0].textContent === want, mb.map((b) => b.textContent));
+        mb[0].click(); await wait(40);
+        const L2 = K.line(fid);
+        ok('sylSplitCommits', K.groups(L2).length === G.length + 1 && K.undoWhy() === 'syl' && L2.units[G[gi].i + 1].k === 1 && K.unitsToText(L2.units).includes(want.replace(' | ', '|')), [K.undoWhy(), syl(L2)]);
+        K.undo(); ok('sylSplitUndo', K.groups(K.line(fid)).length === G.length && !K.line(fid).units.some((u) => u.k != null)); }
+      /* 手动音节：拆分 / 合并 / 恢复自动；工程读写往返；文本里的 | ；retext 保留没改动的字的 k=0；fixLine 清掉无意义的 k */
+      { K.setProject(K.blank()); const l = mkL('fontaine reine', 10, 12); K.project.lines = [l]; K.commit('edit');
+        K.ops.syl(l, 5, 1); ok('sylManualSplit', syl(K.project.lines[0]) === 'fon|ta|i|ne[ ]|rei|ne' && K.undoWhy() === 'syl', syl(K.project.lines[0]));
+        K.ops.syl(K.project.lines[0], 6, 0); ok('sylManualMerge', syl(K.project.lines[0]) === 'fon|ta|ine[ ]|rei|ne', syl(K.project.lines[0]));
+        K.ops.syl(K.project.lines[0], 3, 0); ok('sylMergeAuto', syl(K.project.lines[0]) === 'fonta|ine[ ]|rei|ne' && K.project.lines[0].units[3].k === 0, syl(K.project.lines[0]));
+        const rt = K.normalizeProject(JSON.parse(JSON.stringify(K.project)));
+        ok('sylProjectRoundTrip', JSON.stringify(rt.lines) === JSON.stringify(K.project.lines) && syl(rt.lines[0]) === 'fonta|ine[ ]|rei|ne', syl(rt.lines[0]));
+        ok('sylTextSyntax', K.unitsToText(K.project.lines[0].units) === 'fonta|ine reine', K.unitsToText(K.project.lines[0].units));
+        K.retext(K.project.lines[0], 'fonta|ine reines'); K.commit('text');
+        ok('sylRetextKeepsK0', syl(K.project.lines[0]) === 'fonta|ine[ ]|rei|nes' && K.project.lines[0].units[3].k === 0, syl(K.project.lines[0]));
+        K.retext(K.project.lines[0], 'fontaine reines'); ok('sylRetextTextWinsForSplit', syl(K.project.lines[0]) === 'fontaine[ ]|rei|nes' && !K.project.lines[0].units.some((u) => u.k === 1), syl(K.project.lines[0]));
+        K.undo(); K.undo(); K.undo(); K.undo();
+        ok('sylUndoSteps', syl(K.project.lines[0]) === 'fon|tai|ne[ ]|rei|ne' && !K.project.lines[0].units.some((u) => u.k != null), syl(K.project.lines[0]));
+        K.ops.syl(K.project.lines[0], 5, 1); K.ops.sylReset(K.project.lines[0]);
+        ok('sylReset', syl(K.project.lines[0]) === 'fon|tai|ne[ ]|rei|ne' && K.undoWhy() === 'syl' && !K.project.lines[0].units.some((u) => 'k' in u));
+        ok('sylPipeParse', K.parseText('Fonta|ine')[5].k === 1 && K.parseText('a | b').map((u) => u.t).join('') === 'a | b' && K.parseText('星|ほし').length === 4);
+        const bad = K.newLine({ units: [{ t: 'a', r: null, s: 0, k: 1 }, { t: 'b', r: null, s: 1, k: 7 }, { t: 'い', r: null, s: 2, k: 1 }, { t: 'c', r: null, s: 3, k: 0 }], end: 4 }); K.fixLine(bad);
+        ok('sylFixLineSanitises', bad.units.map((u) => u.k).join() === ',,,', bad.units.map((u) => u.k));
+        const np = K.normalizeProject({ lines: [{ units: [{ t: 'a', s: 0 }, { t: 'b', s: 1, k: true }, { t: 'c', s: 2, k: '<x>' }], end: 3 }] });
+        ok('sylNormalizeK', np.lines[0].units[1].k === 1 && !('k' in np.lines[0].units[2]), np.lines[0].units);
+        // 拆分 / 合并 / 复制为和声行都带着 k
+        const l2 = mkL('ab cd', 1, 3); l2.units[1].k = 1; l2.units[4].k = 1; K.fixLine(l2); K.project.lines = [l2]; K.commit('edit');
+        const dupl = K.ops.dup(l2); ok('sylDupKeepsK', dupl.units[1].k === 1 && dupl.units[4].k === 1);
+        K.undo(); const nl = K.ops.split(K.project.lines[0], K.project.lines[0].units[3].s - 0.001);
+        ok('sylSplitLineKeepsK', nl && K.lineText(nl) === 'cd' && nl.units[1].k === 1 && K.project.lines.find((x) => x !== nl).units[1].k === 1, nl && syl(nl));
+        K.ops.merge(K.project.lines.find((x) => x !== nl)); ok('sylMergeLineKeepsK', syl(K.project.lines[0]) === 'a|b[ ]|c|d', syl(K.project.lines[0])); }
+      /* 硬推：最小间隔 / 空间不够时平均挤 / 完全没空间才重合；日语也一样 */
+      { const l = mkL('fontaine reine', 10, 12), G = K.groups(l);
+        K.setBoundary(l, G[3].i, 0, 10.2); const s1 = starts(l);
+        ok('pushMinGap', s1[0] === 10 && near(s1[1], 10.14) && near(s1[2], 10.17) && s1[3] === 10.2 && !tidy(l).length, s1);
+        const l2 = mkL('fontaine reine', 10, 12); K.setBoundary(l2, G[3].i, 0, 10.05); const s2 = starts(l2);
+        ok('pushSqueeze', s2[0] === 10 && near(s2[1], 10.017, 1.5e-3) && near(s2[2], 10.033, 1.5e-3) && s2[3] === 10.05 && new Set(l2.units.slice(0, 8).map((u) => u.s)).size === 8, [s2, l2.units.map((u) => u.s)]);
+        const l3 = mkL('fontaine reine', 10, 12); K.setBoundary(l3, G[1].i, 0, 11.7); const s3 = starts(l3);
+        ok('pushRightMinGap', near(s3[2], 11.73) && near(s3[3], 11.76) && near(s3[4], 11.79) && l3.end === 12 && !tidy(l3).length, [s3, l3.end]);
+        const l3b = mkL('fontaine reine', 10, 12); K.setBoundary(l3b, G[1].i, 0, 11.9); const s3b = starts(l3b);
+        ok('pushRightSqueeze', s3b[1] === 11.9 && s3b.every((v, i) => !i || v > s3b[i - 1]) && s3b[4] <= l3b.end - 0.05 + 1e-9 && l3b.end === 12, [s3b, l3b.end]);
+        const l4 = mkL('fontaine', 10, 12); K.setEnd(l4, 11); ok('setEndRescales', l4.end === 11 && l4.units.every((u) => u.s < 11) && !tidy(l4).length, l4.units.map((u) => u.s));
+        const J = mkL('あいうえお', 10, 15); K.setBoundary(J, 4, 0, 10.5); const sj = J.units.map((u) => u.s);
+        ok('pushMinGapCJK', sj.join() === '10,10.41,10.44,10.47,10.5', sj); }
+      /* 修复：故意把字母、音节开头挤在一起，再“音节内字母均分”（一步撤销） */
+      { K.setProject(K.blank()); const l = mkL('fontaine reine', 10, 12), S0 = starts(l);
+        for (let i = 1; i < 8; i++) l.units[i].s = 10.6; l.units[8].s = 10.6; K.fixLine(l);            // fon 的 o、n 挤在 10.6，后面的 tai、ne 也挤在 10.6
+        const l2 = mkL('Hydro rhythm', 20, 22); l2.units.forEach((u, i) => { if (i > 0 && i < 6) u.s = 20; }); K.fixLine(l2);
+        K.project.lines = [l, l2]; K.commit('edit'); const snapB = JSON.stringify(K.project);
+        ok('evenSylBrokenBefore', tidy(l).length > 0 && tidy(l2).length > 0);
+        K.select(l.id); K.ops.evenSyl(K.project.lines[0]);
+        const a = K.project.lines[0], sa = starts(a);
+        out.evenSyl = { syl: syl(a), s: a.units.map((u) => u.s) };
+        ok('evenSylRepairs', !tidy(a).length && sa[0] === 10 && sa[3] === S0[3] && sa[4] === S0[4] && sa[1] > sa[0] && sa[2] > sa[1] && sa[2] < sa[3], out.evenSyl);
+        ok('evenSylLettersEven', near(a.units[1].s - a.units[0].s, a.units[2].s - a.units[1].s, 1.5e-3), a.units.slice(0, 3).map((u) => u.s));
+        ok('evenSylOneUndo', K.undoWhy() === 'evenSyl' && (K.undo(), JSON.stringify(K.project) === snapB));
+        K.ops.evenSylAll(); ok('evenSylAllLines', K.project.lines.every((x) => !tidy(x).length) && K.undoWhy() === 'evenSyl' && (K.undo(), JSON.stringify(K.project) === snapB));
+        const n0 = K.undoWhy(); K.ops.evenSyl(mkL('あいう', 0, 3)); ok('evenSylNoopNoCommit', K.undoWhy() === n0);
+        // 读工程文件不偷偷改时间
+        const pj = K.normalizeProject(JSON.parse(snapB)); ok('noRewriteOnLoad', JSON.stringify(pj.lines) === JSON.stringify(JSON.parse(snapB).lines)); }
+      /* 日语：没有字母的行，边界和以前完全一样；不推挤的拖动（含按拍）结果和旧算法逐字节相同 */
+      { const oldSB = (l, i, j, T) => { const u = l.units[i], n = K.nMora(u);
+          if (j > 0) { u.m = K.subTimes(l, i).slice(1, n); u.m[j - 1] = T; } else { if (u.m) u.m = K.subTimes(l, i).slice(1, n); u.s = T; }
+          l.units.forEach((x, k) => { if (k < i) { if (x.s > T) x.s = T; if (x.m) x.m = x.m.map((v) => Math.min(v, T)); } else if (k > i) { if (x.s < T) x.s = T; if (x.m) x.m = x.m.map((v) => Math.max(v, T)); } else { if (j > 0 && x.s > T) x.s = T; if (x.m) x.m = x.m.map((v, q) => (q < j - 1 ? Math.min(v, T) : q > j - 1 ? Math.max(v, T) : v)); } });
+          if (l.end < T + 0.05) l.end = T + 0.05; K.fixLine(l); };
+        const jp = K.normalizeProject(K.SAMPLES[0].project).lines.filter((x) => !/[A-Za-zÀ-ɏЀ-ӿ0-9]/.test(K.lineText(x)));
+        let bcount = 0, diffs = [], tried = 0;
+        jp.forEach((l) => {
+          const oldB = []; l.units.forEach((u, i) => { for (let j = 0; j < K.nMora(u); j++) oldB.push({ i, j }); });
+          if (JSON.stringify(oldB) !== JSON.stringify(K.bounds(l))) bcount++;
+          const B = K.bounds(l);
+          B.forEach((b, x) => { const lo = x ? K.boundTime(l, B[x - 1]) : K.ls(l) - 0.3, hi = x + 1 < B.length ? K.boundTime(l, B[x + 1]) : l.end;
+            if (hi - lo < 0.004) return;
+            const T = K.r3(lo + (hi - lo) * 0.37), a = JSON.parse(JSON.stringify(l)), c = JSON.parse(JSON.stringify(l)); tried++;
+            oldSB(a, b.i, b.j, T); K.setBoundary(c, b.i, b.j, T);
+            if (JSON.stringify(a) !== JSON.stringify(c)) diffs.push([K.lineText(l), b, T]); }); });
+        out.jpSame = { lines: jp.length, tried, diffs: diffs.slice(0, 3) };
+        ok('jpBoundsUnchanged', jp.length > 30 && bcount === 0, { jp: jp.length, bcount });
+        ok('jpNonPushDragIdentical', tried > 300 && !diffs.length, out.jpSame); }
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; }
 
     // ---- H. 拖入多个文件：全部处理（工程在前，媒体在后） ----
     { const mk = (title) => new File([JSON.stringify({ title, lines: [{ start: 1, end: 2, text: title }] })], title + '.kara.json', { type: 'application/json' });

@@ -31,7 +31,7 @@
   /* 拆分处的空白字直接丢掉：新行不以空白开头，前一行也不以空白结尾；其余时间原样保留（本来就单调） */
   ops.split = (l, t) => {
     const blank = (u) => !u.t.trim();
-    const k = l.units.findIndex((u) => u.s >= t);
+    const g = K.groups(l).find((q) => (!q.w || q.f) && l.units[q.i].s >= t), k = g ? g.i : -1;       // 只在词与词之间拆（不拆开一个词）
     if (k <= 0) return null;
     let a = k, b = k;
     while (a > 0 && blank(l.units[a - 1])) a--;
@@ -53,12 +53,28 @@
   };
   const SET_WHY = { newPara: 'para', dots: 'dots', row: 'row', align: 'align', showAt: 'showHide', hideAt: 'showHide' };
   ops.set = (l, k, v) => { l[k] = v; K.commit(SET_WHY[k] || 'settings'); };
-  /* 打点：播放时每按一次，把选中行的下一个字（带注音的字按拍）的开始时间设为当前时间 */
+  /* 手动音节：在字母 i 处分开（v = 1）/ 和前一个音节合并（v = 0）。和自动结果相同时不留覆盖 */
+  ops.syl = (l, i, v) => {
+    const u = l.units[i]; if (!u) return;
+    delete u.k; const auto = K.groups(l).some((g) => g.w && g.i === i);
+    if (auto !== !!v) u.k = v;
+    K.fixLine(l); K.commit('syl');
+  };
+  ops.sylReset = (l) => { if (!l.units.some((u) => u.k != null)) return; l.units.forEach((u) => delete u.k); K.commit('syl'); };
+  /* 音节内字母均分：一行 / 全部歌词，都是一步撤销 */
+  const evenSyl = (lines) => {
+    const n = lines.filter((l) => K.evenSyllables(l)).length;
+    if (n) { K.commit('evenSyl'); K.toast(K.t('msg.evenSyl', { n }), 'ok'); } else K.toast(K.t('msg.evenSylNone'));
+    return n;
+  };
+  ops.evenSyl = (l) => evenSyl([l]);
+  ops.evenSylAll = () => evenSyl(K.project.lines);
+  /* 打点：播放时每按一次，把选中行的下一个字（字母按音节，带注音的字按拍）的开始时间设为当前时间 */
   ops.tap = (t) => {
     const l = K.sel(); if (!l) return;
     const B = K.bounds(l); let i = K.ui.tapIdx;
     if (i >= B.length) {                   // 最后再按一次 = 这一行结束，跳到下一行
-      l.end = Math.max(t, l.units[l.units.length - 1].s + 0.05); K.fixLine(l); K.commit('tap');
+      K.setEnd(l, Math.max(t, K.minEnd(l))); K.commit('tap');
       const sc = K.screen(), nx = sc.ord[sc.ord.indexOf(l) + 1];
       if (nx) K.select(nx.id); else K.ui.tapIdx = B.length;
       return;

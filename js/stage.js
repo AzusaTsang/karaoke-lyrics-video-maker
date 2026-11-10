@@ -21,15 +21,13 @@
     }
     return null;
   }
-  /* 校时：把“当前时间”钉在离鼠标最近的边界上（字的开头；带注音的字还包括每一拍） */
+  /* 校时：把“当前时间”钉在离鼠标最近的边界上（字 / 音节的开头；带注音的字还包括每一拍） */
   const bx = (L, b, l) => L.units[b.i].x + (L.units[b.i].w * b.j) / K.nMora(l.units[b.i]);
   const btimes = (l) => K.bounds(l).map((b) => K.boundTime(l, b)).concat([l.end]);
   function retime(l, o, b, T) {
     l.units = JSON.parse(o.units); l.end = o.end;
-    if (b) K.setBoundary(l, b.i, b.j, T);
-    else { l.end = T; l.units.forEach((x) => { if (x.s > T - 0.02) x.s = T - 0.02; if (x.m) x.m = x.m.map((v) => Math.min(v, T - 0.02)); }); K.fixLine(l); }
+    if (b) K.setBoundary(l, b.i, b.j, T); else K.setEnd(l, T);
   }
-  const what = (l, b) => { const un = l.units[b.i], ms = K.moras(un.r); return b.j ? T('tip.charMora', { c: un.t, n: b.j + 1, m: ms[b.j] || '' }) : T('tip.char', { c: un.t }); };
   function move(e) {
     const p = pt(e);
     if (!drag) {
@@ -51,7 +49,7 @@
       /* 被挤动的其他边界（为了保持时间单调而跟着移动的字）在画面上标成橙色 */
       const now = btimes(l), self = b ? K.bounds(l).findIndex((c) => c.i === b.i && c.j === b.j) : now.length - 1;
       drag.pushed = new Set(now.map((v, i) => (i !== self && Math.abs(v - drag.t0[i]) > 1e-4 ? i : -1)).filter((i) => i >= 0));
-      drag.label = (b ? T('tip.retime', { what: what(l, b), t: K.fmt3(drag.T) }) : T('tip.lineEnd', { t: K.fmt3(drag.T) })) + (drag.pushed.size ? '\n' + T('tip.pushed', { n: drag.pushed.size }) : '');
+      drag.label = (b ? T('tip.retime', { what: K.boundName(l, b), t: K.fmt3(drag.T) }) : T('tip.lineEnd', { t: K.fmt3(drag.T) })) + (drag.pushed.size ? '\n' + T('tip.pushed', { n: drag.pushed.size }) : '');
       K.touch();
     }
     K.tip(e.clientX, e.clientY, drag.label);

@@ -38,7 +38,7 @@
   /* 靠近播放头（6px 内）吸附；按住 Shift 不吸附 */
   let snapped = false;
   const snap = (t, e) => { if (!e.shiftKey && Math.abs(LX(t) - X(K.now())) < 6) { snapped = true; return K.now() - off(); } return t; };
-  const boundWhat = (l, i) => { const b = K.bounds(l)[i], un = l.units[b.i], ms = K.moras(un.r); return b.j ? K.t('tip.charMora', { c: un.t, n: b.j + 1, m: ms[b.j] || '' }) : K.t('tip.char', { c: un.t }); };
+  const boundWhat = (l, i) => K.boundName(l, K.bounds(l)[i]);
   /* 提示文字：正在改的值 */
   const tipText = (z, l, i) => {
     const I = K.screen().info.get(l.id);
@@ -78,7 +78,7 @@
     } else if (d.zone === 'tick') {
       const B = K.bounds(l), b = B[d.i], lo = d.i > 0 ? K.boundTime(l, B[d.i - 1]) : 0, hi = d.i < B.length - 1 ? K.boundTime(l, B[d.i + 1]) : l.end - 0.03;
       K.setBoundary(l, b.i, b.j, Math.max(lo, Math.min(hi, snap(t, e))));
-    } else if (d.zone === 'end') { l.end = Math.max(snap(t, e), l.units[l.units.length - 1].s + 0.05); K.fixLine(l); }
+    } else if (d.zone === 'end') K.setEnd(l, Math.max(snap(t, e), K.minEnd(l)));
     else if (d.zone === 'show') l.showAt = K.r3(Math.min(snap(t, e), K.ls(l) - 0.05));
     else if (d.zone === 'hide') l.hideAt = K.r3(Math.max(snap(t, e), K.ls(l) + 0.1));
     K.touch();
@@ -119,7 +119,7 @@
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       const r = cv.getBoundingClientRect(), h = hit(e.clientX - r.left, e.clientY - r.top);
-      if (h.l) { K.select(h.l.id); K.lineMenu(h.l, e.clientX, e.clientY); }
+      if (h.l) { K.select(h.l.id); K.lineMenu(h.l, e.clientX, e.clientY, h.zone === 'tick' ? K.bounds(h.l)[h.i] : null); }
       else if (h.zone === 'empty') K.menu(e.clientX, e.clientY, [[K.t('menu.add'), () => { const l = K.ops.add(Math.max(0, K.r3(h.t))); if (h.row >= K.S().rows || h.row > 0) K.ops.set(l, 'row', h.row); }]]);
     });
     cv.addEventListener('wheel', (e) => {
@@ -202,12 +202,14 @@
       if (sel) {
         const B = K.bounds(l), hb = H1 === 'tick' ? B[hv.i] : null;
         g.strokeStyle = 'rgba(255,255,255,.75)'; g.fillStyle = '#fff'; g.font = LF;
-        l.units.forEach((u, i) => {
-          const x = Math.round(LX(u.s)) + 0.5, nx = LX(K.unitEnd(l, i)), hot = hb && hb.i === i && hb.j === 0;
+        /* 一个刻度 = 一个字 / 一个音节（音节内部的字母没有刻度，跟着音节按比例走）；文字裁在自己的区间里 */
+        const G = K.groups(l);
+        G.forEach((q, gi) => {
+          const i = q.i, u = l.units[i], x = Math.round(LX(u.s)) + 0.5, nx = LX(gi + 1 < G.length ? l.units[G[gi + 1].i].s : l.end), hot = hb && hb.i === i && hb.j === 0, txt = K.gText(l, q);
           g.save(); if (hot) { g.strokeStyle = '#ffd84d'; g.lineWidth = 3; }
-          g.beginPath(); g.moveTo(x, y + h * (hot ? 0.35 : 0.5)); g.lineTo(x, y + h); g.stroke(); g.restore();
-          if (nx - x > 9 && u.t.trim()) g.fillText(u.t, x + 2, y + h * 0.28);
-          K.subTimes(l, i).slice(1, -1).forEach((tm, q) => { const xm = Math.round(LX(tm)) + 0.5, hm = hb && hb.i === i && hb.j === q + 1; g.save(); g.strokeStyle = hm ? '#ffe9a0' : 'rgba(255,216,77,.8)'; g.lineWidth = hm ? 3 : 1; g.beginPath(); g.moveTo(xm, y + h * (hm ? 0.45 : 0.68)); g.lineTo(xm, y + h); g.stroke(); g.restore(); });
+          g.beginPath(); g.moveTo(x, y + h * (hot ? 0.35 : q.w && !q.f ? 0.6 : 0.5)); g.lineTo(x, y + h); g.stroke(); g.restore();
+          if (nx - x > 9 && txt.trim()) { g.save(); g.beginPath(); g.rect(x, y, nx - x - 1, h); g.clip(); g.fillText(txt, x + 2, y + h * 0.28); g.restore(); }
+          if (!q.w) K.subTimes(l, i).slice(1, -1).forEach((tm, q) => { const xm = Math.round(LX(tm)) + 0.5, hm = hb && hb.i === i && hb.j === q + 1; g.save(); g.strokeStyle = hm ? '#ffe9a0' : 'rgba(255,216,77,.8)'; g.lineWidth = hm ? 3 : 1; g.beginPath(); g.moveTo(xm, y + h * (hm ? 0.45 : 0.68)); g.lineTo(xm, y + h); g.stroke(); g.restore(); });
           if (K.ui.tapArmed && (B[K.ui.tapIdx] || {}).i === i) { g.fillStyle = '#ffd84d'; g.fillRect(x - 1, y + h - 4, Math.max(3, nx - x), 4); g.fillStyle = '#fff'; }
         });
       } else { g.fillStyle = '#d5dae3'; g.font = LF; g.fillText(K.lineText(l), x1 + 4, y + h / 2); }

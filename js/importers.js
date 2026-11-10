@@ -127,7 +127,9 @@
       e.segs.forEach((sg, i2) => {
         let txt = sg.text; if (i2 === 0) txt = txt.replace(/^\s+/, ''); if (i2 === e.segs.length - 1) txt = txt.replace(/\s+$/, '');
         const nxAt = i2 + 1 < e.segs.length ? e.segs[i2 + 1].at : end, us = K.parseText(txt); if (!us.length) return;
-        const tmp = { units: us, end: 0 }; K.evenSplit(tmp, sg.at, Math.max(nxAt, sg.at));
+        /* 行尾的标点（如 KING!）也占一份，不压在行结束上（否则行结束会被顶后 0.05 秒） */
+        const snd = us.filter((u) => /[^\s\p{P}]/u.test(u.t)).length, tail = i2 === e.segs.length - 1 && snd && !/[^\s\p{P}]/u.test(us[us.length - 1].t);
+        const e2 = Math.max(nxAt, sg.at), tmp = { units: us, end: 0 }; K.evenSplit(tmp, sg.at, tail ? sg.at + ((e2 - sg.at) * snd) / (snd + 1) : e2);
         us.forEach((u) => units.push({ t: u.t, r: u.r, s: u.s }));
       });
       if (units.length) lines.push({ start: units[0].s, end, units });
@@ -140,12 +142,13 @@
      时间都加上“整体偏移”（样式里的同步偏移），这样导出的文件对着媒体直接就是对的；注音（furigana）三种格式都表示不了，导出时去掉 */
   const pad = (n, w) => String(n).padStart(w || 2, '0');
   const lrcT = (t) => { const cs = Math.max(0, Math.round(t * 100)), m = Math.floor(cs / 6000), r = cs - m * 6000; return pad(m) + ':' + pad(Math.floor(r / 100)) + '.' + pad(r % 100); };
+  /* words：增强 LRC，每组一个 <时间>（字母按音节、其余按字；音节里的字母读回时在两个标签之间平均分） */
   K.exportLrcText = (words) => {
     const off = K.S().offset, head = []; const ti = (K.project.title || '').replace(/[\r\n\]]/g, ' ').trim();
     if (ti) head.push('[ti:' + ti + ']');
     head.push('[re:Karaoke Lyrics Studio]', '[ve:' + K.APP.version + ']');
     const body = byStart().filter((l) => plain(l).trim()).map((l) => '[' + lrcT(K.ls(l) + off) + ']' +
-      (words ? l.units.map((u) => '<' + lrcT(u.s + off) + '>' + u.t).join('') + '<' + lrcT(l.end + off) + '>' : plain(l)));
+      (words ? K.groups(l).map((g) => '<' + lrcT(l.units[g.i].s + off) + '>' + l.units.slice(g.i, g.e).map((u) => u.t).join('')).join('') + '<' + lrcT(l.end + off) + '>' : plain(l)));
     return head.concat(body).join('\n') + '\n';
   };
   const srtT = (t) => { const ms = Math.max(0, Math.round(t * 1000)); return pad(Math.floor(ms / 3600000)) + ':' + pad(Math.floor(ms / 60000) % 60) + ':' + pad(Math.floor(ms / 1000) % 60) + ',' + pad(ms % 1000, 3); };

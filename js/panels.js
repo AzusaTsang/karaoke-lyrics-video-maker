@@ -17,9 +17,25 @@
     m.style.left = Math.min(x, innerWidth - m.offsetWidth - 8) + 'px'; m.style.top = Math.min(y, innerHeight - m.offsetHeight - 8) + 'px';
   };
   addEventListener('pointerdown', (e) => { const m = $('menu'); if (!m.hidden && !m.contains(e.target)) m.hidden = true; }, true);
-  K.lineMenu = (l, x, y) => {
-    const I = K.screen().info.get(l.id), set = (k, v) => () => K.ops.set(l, k, v);
+  /* 音节菜单（右键时间线刻度 / 行面板里的音节行）：在某个字母处分开…、和前一个音节合并、整行恢复自动 */
+  const sylItems = (l, i, x, y) => {
+    const G = K.groups(l), g = G.find((q) => q.w && q.i === i), U = l.units, out = [];
+    if (!g) return out;
+    const txt = (a, b) => U.slice(a, b).map((u) => u.t).join(''), at = [];
+    for (let k = g.i + 1; k < g.c; k++) if (K.isLetter(U[k])) at.push(k);
+    if (at.length) out.push([T('menu.sylSplit'), () => K.menu(x, y, at.map((k) => [txt(g.i, k) + ' | ' + txt(k, g.c), () => K.ops.syl(l, k, 1)]))]);
+    if (!g.f) out.push([T('menu.sylMerge'), () => K.ops.syl(l, g.i, 0)]);
+    return out;
+  };
+  const hasSyl = (l) => K.groups(l).some((g) => g.w);
+  K.sylMenu = (l, i, x, y) => { const it = sylItems(l, i, x, y); if (l.units.some((u) => u.k != null)) it.push([T('menu.sylReset'), () => K.ops.sylReset(l)]); if (it.length) K.menu(x, y, it); };
+  K.lineMenu = (l, x, y, b) => {
+    const I = K.screen().info.get(l.id), set = (k, v) => () => K.ops.set(l, k, v), syl = b && !b.j ? sylItems(l, b.i, x, y) : [];
+    const ew = hasSyl(l) ? [[T('menu.evenSyl'), () => K.ops.evenSyl(l)]] : [];
+    if (K.project.lines.some(hasSyl)) ew.push([T('menu.evenSylAll'), () => K.ops.evenSylAll()]);
+    if (l.units.some((u) => u.k != null)) ew.push([T('menu.sylReset'), () => K.ops.sylReset(l)]);
     K.menu(x, y, [
+      ...syl, syl.length ? null : undefined,
       [I.para ? T('menu.paraOn') : T('menu.paraSet'), set('newPara', I.para ? (l.newPara === true ? null : false) : true), I.para],
       l.newPara != null ? [T('menu.paraAuto'), set('newPara', null)] : null,
       null,
@@ -33,9 +49,9 @@
       [T('menu.resetShow'), () => { l.showAt = null; l.hideAt = null; K.commit('showHide'); }],
       null,
       [T('menu.furiLine'), () => K.autoFurigana('line')], [T('menu.furiAll'), () => K.autoFurigana('all')],
-      null,
+      null, ...ew, ew.length ? null : undefined,
       [T('menu.del'), () => K.ops.del(l)],
-    ].filter((v, i, a) => !(v === null && a[i - 1] === null)));
+    ].filter((v) => v !== undefined).filter((v, i, a) => !(v === null && a[i - 1] === null)));
   };
 
   /* ---------- 歌词列表 ---------- */
@@ -61,7 +77,7 @@
     const l = K.sel(), el = $('tab-line');
     if (!l) { el.innerHTML = `<div class="hint pad">${T('line.help_html')}</div>`; return; }
     const I = K.screen().info.get(l.id), foc = document.activeElement && el.contains(document.activeElement) ? document.activeElement.dataset.k : null;
-    const nB = K.bounds(l).length, atTip = et('line.atTip'), moraTip = et('line.atMoraTip');
+    const nB = K.bounds(l).length, atTip = et('line.atTip'), moraTip = et('line.atMoraTip'), hs = hasSyl(l), sylTip = et('line.sylMenu');
     el.innerHTML = `
       <h4>${et('line.gText')}</h4>
       <label class="blk" for="lnText">${et('line.text')}</label>
@@ -69,7 +85,7 @@
       <div class="btns"><button data-a="furi" title="${et('line.furiTip')}">${et('line.furi')}</button></div>
       <h4>${et('line.gTiming')}</h4>
       <div class="row"><label>${et('line.startEnd')}</label><input data-k="start" type="number" step="0.01" value="${K.ls(l).toFixed(2)}" aria-label="${et('line.start')}"><input data-k="end" type="number" step="0.01" value="${l.end.toFixed(2)}" aria-label="${et('line.end')}"></div>
-      <div class="btns ind"><button data-a="m50" title="${et('line.nudgeTip')}">−50ms</button><button data-a="p50" title="${et('line.nudgeTip')}">+50ms</button><button data-a="even" title="${et('line.evenTip')}">${et('line.even')}</button></div>
+      <div class="btns ind"><button data-a="m50" title="${et('line.nudgeTip')}">−50ms</button><button data-a="p50" title="${et('line.nudgeTip')}">+50ms</button><button data-a="even" title="${et('line.evenTip')}">${et('line.even')}</button>${hs ? `<button data-a="evenSyl" title="${et('line.evenSylTip')}">${et('line.evenSyl')}</button>` : ''}</div>
       <h4>${et('line.gDisplay')}</h4>
       <div class="row"><label>${et('line.rowAlign')}</label><select data-k="row" aria-label="${et('line.rowLabel')}">${opt('', l.row == null ? '' : 'x', T('line.rowAutoN', { n: I.row + 1 }))}${[0, 1, 2, 3].map((r) => opt(r, l.row, T('line.rowN', { n: r + 1 }))).join('')}</select>
         <select data-k="align" aria-label="${et('line.alignLabel')}">${opt('', l.align || '', T('line.alignAuto'))}${opt('left', l.align, T('line.left'))}${opt('center', l.align, T('line.center'))}${opt('right', l.align, T('line.right'))}</select></div>
@@ -81,9 +97,11 @@
       <div class="btns acts"><button data-a="dup">${et('line.dup')}</button><button data-a="split">${et('line.split')}</button><button data-a="merge">${et('line.merge')}</button><button data-a="del" class="danger">${et('line.del')}</button></div>
       <h4>${et('line.gChars')}</h4>
       <div class="hint">${T('line.tap_html', { cur: Math.min(K.ui.tapIdx + 1, nB), total: nB })}</div>
-      <div class="tblWrap"><table><thead><tr><th scope="col">${et('line.thChar')}</th><th scope="col">${et('line.thRuby')}</th><th scope="col">${et('line.thStart')}</th><th scope="col"><span class="sr">${et('line.thSet')}</span></th></tr></thead><tbody>${(() => { const B = K.bounds(l), cur = B[K.ui.tapIdx] || {}; return l.units.map((u, i) => { const Ts = K.subTimes(l, i), ms = K.moras(u.r), bi = B.findIndex((b) => b.i === i);
-        return `<tr class="${cur.i === i && !cur.j ? 'cur' : ''}"><td>${esc(u.t) || '&nbsp;'}</td><td><input data-k="r${i}" data-r="${i}" value="${esc(u.r || '')}" aria-label="${et('line.rubyFor', { c: u.t })}"></td><td><input data-k="s${i}" data-b="${bi}" type="number" step="0.01" value="${u.s.toFixed(2)}" aria-label="${et('line.startFor', { c: u.t })}"></td><td><button data-n="${bi}" title="${atTip}" aria-label="${atTip}">＠</button></td></tr>` +
-          ms.slice(1).map((m, q) => `<tr class="sub${cur.i === i && cur.j === q + 1 ? ' cur' : ''}"><td></td><td class="mora">└ ${esc(m)}</td><td><input data-k="b${bi + q + 1}" data-b="${bi + q + 1}" type="number" step="0.01" value="${Ts[q + 1].toFixed(2)}" aria-label="${et('line.startFor', { c: m })}"></td><td><button data-n="${bi + q + 1}" title="${moraTip}" aria-label="${moraTip}">＠</button></td></tr>`).join(''); }).join(''); })()}</tbody></table></div>`;
+      ${hs ? `<div class="hint">${T('line.syl_html')}</div><div class="btns"><button data-a="sylReset" ${l.units.some((u) => u.k != null) ? '' : 'disabled'}>${et('menu.sylReset')}</button></div>` : ''}
+      <div class="tblWrap"><table><thead><tr><th scope="col">${et('line.thChar')}</th><th scope="col">${et('line.thRuby')}</th><th scope="col">${et('line.thStart')}</th><th scope="col"><span class="sr">${et('line.thSet')}</span></th></tr></thead><tbody>${(() => { const B = K.bounds(l), cur = B[K.ui.tapIdx] || {}; return K.groups(l).map((g) => { const i = g.i, u = l.units[i], Ts = K.subTimes(l, i), ms = g.w ? [] : K.moras(u.r), bi = B.findIndex((b) => b.i === i), lab = g.w ? K.gText(l, g) : u.t;
+        const first = g.w ? `<td class="syl${g.f ? '' : ' in'}">${g.f ? '' : '·'}${esc(lab)}</td><td><button class="sylb" data-syl="${i}" title="${sylTip}" aria-label="${sylTip}">⋯</button></td>` : `<td>${esc(u.t) || '&nbsp;'}</td><td><input data-k="r${i}" data-r="${i}" value="${esc(u.r || '')}" aria-label="${et('line.rubyFor', { c: u.t })}"></td>`;
+        return `<tr class="${cur.i === i && !cur.j ? 'cur' : ''}"${g.w ? ` data-g="${i}"` : ''}>${first}<td><input data-k="s${i}" data-b="${bi}" type="number" step="0.01" value="${u.s.toFixed(2)}" aria-label="${et('line.startFor', { c: lab })}"></td><td><button data-n="${bi}" title="${atTip}" aria-label="${atTip}">＠</button></td></tr>` +
+          ms.slice(1).map((m, q) => `<tr class="sub${cur.i === i && cur.j === q + 1 ? ' cur' : ''}"><td></td><td class="mora">└ ${esc(m)}</td><td><input data-k="b${bi + q + 1}" data-b="${bi + q + 1}" type="number" step="0.01" value="${Ts[q + 1].toFixed(2)}" aria-label="${et('line.startFor', { c: m })}"></td><td><button data-n="${bi + q + 1}" title="${moraTip}" aria-label="${moraTip}">＠</button></td></tr>`).join('');}).join(''); })()}</tbody></table></div>`;
     K.selTitles(el);
     if (foc) { const f = el.querySelector(`[data-k="${foc}"]`); if (f) f.focus(); }
   }
@@ -93,7 +111,7 @@
       const l = K.sel(), d = e.target.dataset, v = e.target.value; if (!l) return;
       if (d.k === 'text') { if (K.retext(l, v)) K.commit('text'); else buildLine(); }
       else if (d.k === 'start') K.ops.shift(l, parseFloat(v) - K.ls(l));
-      else if (d.k === 'end') { l.end = parseFloat(v) || l.end; K.fixLine(l); K.commit('timing'); }
+      else if (d.k === 'end') { const v2 = parseFloat(v); if (isFinite(v2)) { K.setEnd(l, Math.max(v2, K.minEnd(l))); K.commit('timing'); } else buildLine(); }
       else if (d.k === 'row') K.ops.set(l, 'row', v === '' ? null : +v);
       else if (d.k === 'align') K.ops.set(l, 'align', v || null);
       else if (d.k === 'newPara') K.ops.set(l, 'newPara', untri(v));
@@ -107,9 +125,13 @@
       const l = K.sel(), d = e.target.dataset; if (!l) return;
       const t = K.now() - K.S().offset;
       if (d.n != null) { K.ui.tapIdx = +d.n; K.ops.tap(K.r3(t)); return; }
+      if (d.syl != null) { const r = e.target.getBoundingClientRect(); K.sylMenu(l, +d.syl, r.left, r.bottom + 2); return; }
       ({ m50: () => K.ops.shift(l, -0.05), p50: () => K.ops.shift(l, 0.05), even: () => K.ops.even(l), dup: () => K.ops.dup(l), split: () => K.ops.split(l, t), merge: () => K.ops.merge(l), del: () => K.ops.del(l),
-        autoShow: () => K.ops.set(l, 'showAt', null), autoHide: () => K.ops.set(l, 'hideAt', null), furi: () => K.autoFurigana('line') }[d.a] || (() => {}))();
+        autoShow: () => K.ops.set(l, 'showAt', null), autoHide: () => K.ops.set(l, 'hideAt', null), furi: () => K.autoFurigana('line'),
+        evenSyl: () => K.ops.evenSyl(l), sylReset: () => K.ops.sylReset(l) }[d.a] || (() => {}))();
     });
+    /* 右键音节行 = 音节菜单 */
+    el.addEventListener('contextmenu', (e) => { const tr = e.target.closest('tr[data-g]'), l = K.sel(); if (!tr || !l) return; e.preventDefault(); K.sylMenu(l, +tr.dataset.g, e.clientX, e.clientY); });
   }
 
   /* ---------- 设置表单 ---------- */

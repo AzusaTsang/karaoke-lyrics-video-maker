@@ -109,6 +109,7 @@ th{color:var(--mut);font-weight:500;font-size:12px}
 .tblWrap thead th{position:sticky;top:0;background:#1f232a;z-index:1}
 td input{width:100%;min-width:0;padding:2px 5px}td:first-child{font-family:var(--lyr);font-size:15px;width:34px}
 tr.cur td:first-child{color:#ffd84d}
+td.syl{white-space:nowrap}td.syl.in{color:var(--mut)}button.sylb{padding:0 8px;line-height:1.2}
 tr.sub td{border-bottom-color:#1c2026}td.mora{color:var(--mut);font-family:var(--lyr);padding-left:8px}tr.cur td.mora{color:#ffd84d}
 #prog{height:5px;background:#252931;border-radius:3px;overflow:hidden;margin:6px 0}#prog i{display:block;height:100%;width:0;background:var(--acc)}
 

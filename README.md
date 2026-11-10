@@ -1,57 +1,150 @@
-# 卡拉OK歌词工作室
+# Karaoke Lyrics Studio
 
-纯前端的卡拉OK歌词编辑 / 渲染工具：逐字擦除、ふりがな按字对齐、左右交错多行、预备点，
-可导出带透明通道的 PNG 序列（Premiere 等可直接当图像序列导入），也可录屏抠像。
+**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-无需安装和构建：用 Chrome / Edge 直接打开 `index.html`。
+A pure front-end karaoke lyric editor and renderer. Per-character wipe, furigana aligned above each kanji,
+multi-row layouts with count-in dots, a timeline editor, and a draggable wipe cursor for retiming by eye.
+Export a **transparent PNG sequence** that Premiere Pro and other editors import directly, or screen-record the preview.
 
-## 基本流程
+No installation and no build step: open `index.html` in Chrome or Edge, or host the folder on any static server.
 
-1. **载入音视频**（顶部按钮或直接把文件拖进窗口）——歌词以它的播放时间为准。
-2. **导入歌词**：SRT（只有整句时间，字按时长平均分配），或 `tools/align` 输出的逐字对齐 JSON。「示例…」里有两份现成的。
-3. **校时与排版**（见下）。
-4. **保存**：`Ctrl+S` 存成 `.kara.json` 工程文件（歌词、时间、样式都在里面）。浏览器里另有一份自动保存，仅作防丢。
-5. **导出**：右侧「导出」→ PNG 序列；或「录屏模式」。
+![Karaoke Lyrics Studio](assets/social-preview.svg)
 
-## 编辑
+**Try it online:** `https://<your-github-username>.github.io/karaoke-studio/`
+(this is a placeholder - replace it with the URL of your own GitHub Pages deployment, see [Deploying to GitHub Pages](#deploying-to-github-pages))
 
-| 位置 | 操作 | 效果 |
+## Features
+
+- Per-character wipe, with long notes sliding smoothly to the next character
+- Furigana (ruby) written as `漢字{かんじ}`, centred over the kanji it belongs to
+- Timing by kana beat (mora) for characters that carry furigana
+- Multi-row layout: lines take turns on alternating row slots, plus harmony rows that sing at the same time
+- Automatic paragraphs and a three-dot count-in before each paragraph
+- Timeline editor: move lines, retime single characters, set when a line appears and disappears
+- Draggable wipe cursor in the preview: pause, then drag it to where the singer actually is
+- Tap-to-time with `T` while the media plays
+- Undo / redo (150 steps), project files (`.kara.json`), and a browser autosave as a safety net
+- Import SRT, or a per-character aligned JSON (see [forced alignment](#optional-forced-alignment))
+- Export: transparent PNG sequence, single frame PNG, or a clean "screen recording" view
+- Interface language switcher (中文 / 日本語 / English)
+- Two sample projects built in (Japanese with furigana, French)
+
+## Quick start
+
+1. **Open the app.** Open `index.html` in Chrome or Edge (or visit your hosted copy).
+2. **Load the audio or video** (top bar, or drag the file into the window). Lyric times follow its playback time.
+3. **Import lyrics.** Either an SRT file (each line's characters are spread evenly over the cue; you retime afterwards) or an aligned JSON from `tools/align`. The *Samples* menu has two ready-made projects.
+4. **Retime and lay out** (see the editing reference below).
+5. **Save** with `Ctrl+S` to a `.kara.json` project file (lyrics, timing and style are stored in it). The browser also keeps an autosave, but only as a safety net.
+6. **Export** from the *Export* tab on the right: PNG sequence, or screen-recording mode.
+
+## Editing reference
+
+The interface can be switched between 中文, 日本語 and English; the names below follow the English interface.
+
+### Mouse
+
+| Where | Action | Effect |
 | --- | --- | --- |
-| 预览 | 点歌词 | 选中该行 |
-| 预览 | 拖**擦除光标**（竖线 + 圆点），模式「校时」 | 暂停在某一刻，把光标拖到此刻实际唱到的字 → 该字开始时间 = 当前时间 |
-| 预览 | 拖擦除光标，模式「浏览」 | 沿这句歌词前后移动播放时间 |
-| 时间线 | 拖块的实色部分 | 整行平移；上下拖到别的轨道 = 改行位 |
-| 时间线 | 拖选中块下半部的小竖线 | 调单个字的开始时间（靠近播放头会吸附） |
-| 时间线 | 拖实色块右边缘 | 调这一行的结束时间 |
-| 时间线 | 拖浅色窗口的左 / 右细边 | 这一行何时出现 / 消失（变橙色 = 手动；双击恢复自动） |
-| 时间线 | 右键块 / 空白 | 分段、预备点、行位、和声行、拆分、合并、删除 / 添加行 |
-| 时间线 | 滚轮 / Ctrl+滚轮 / 点标尺 | 滚动 / 缩放 / 跳转 |
+| Preview | Click lyrics | Select that line |
+| Preview | Drag the **wipe cursor** (vertical bar with a dot), tool set to *Retime* | Pause at a moment, drag the cursor to the character being sung right now: that character's start time becomes the current time |
+| Preview | Drag the wipe cursor, tool set to *Browse* | Moves the playback position forward and backward along this line |
+| Timeline | Drag the solid part of a block | Move the whole line; drag it up or down to another track to change its row slot |
+| Timeline | Drag the small vertical tick in the lower half of the selected block | Adjust one character's start time (snaps near the playhead) |
+| Timeline | Drag the right edge of the solid block | Adjust the line's end time |
+| Timeline | Drag the left / right thin edge of the pale window | When the line appears / disappears (turns orange when set manually; double-click to go back to automatic) |
+| Timeline | Right-click a block or empty space | Paragraph break, count-in dots, row slot, harmony row, split, merge, delete / add line |
+| Timeline | Wheel / Ctrl+wheel / click the ruler | Scroll / zoom / seek |
 
-快捷键：`空格` 播放 · `←/→` 1 秒（Shift 5 秒）· `,` `.` 逐帧 · `↑/↓` 选行 · `T` 打点 · `[` `]` 整行 ∓20ms（Shift 100ms）·
-`P` 分段 · `D` 预备点 · `H` 复制为和声行 · `S` 播放头处拆分 · `M` 合并下一行 · `1-4` 行位 / `0` 自动 · `Delete` 删除 ·
-`Ctrl+Z / Ctrl+Y` 撤销重做 · `Ctrl+S` 保存。
+### Keyboard
 
-### 显示规则
+| Key | Action |
+| --- | --- |
+| `Space` | Play / pause |
+| `←` `→` | Seek 1 s (`Shift`: 5 s) |
+| `,` `.` | Step one frame |
+| `↑` `↓` | Select previous / next line |
+| `T` | Tap-to-time. While playing, each press sets the start time of the selected line's next character (kana beat by beat for characters with furigana); the final press ends the line and moves to the next one |
+| `[` `]` | Shift the whole line by -20 ms / +20 ms (`Shift`: 100 ms) |
+| `P` | Start a new paragraph here |
+| `D` | Toggle count-in dots for the line |
+| `H` | Duplicate as a harmony row |
+| `S` | Split the line at the playhead |
+| `M` | Merge with the next line |
+| `1`-`4` / `0` | Row slot 1-4 / automatic |
+| `Delete` | Delete the line |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
+| `Ctrl+S` / `Ctrl+Shift+S` / `Ctrl+O` | Save / Save as / Open |
 
-- **段落**：与前面歌词间隔 ≥「自动分段间隔」自动分段，也可手动「在此分段」。段内各行轮流占用行位，行位空出后下一句才出现；
-  **段与段之间不互相预显**——上一段最后一句唱完前不会出现下一段的歌词，下一段另起并带预备点。
-- **预备点**：每段第一句前倒数三个点；每行可单独强制显示 / 不显示。
-- **和声 / 多行同时唱**：「复制为和声行」会放到空闲行位（如第 3 行），各行按自己的时间同时擦除。行位、对齐、出现 / 消失时间都可逐行手动覆盖。
-- **注音**：歌词文本里写 `漢字{かんじ}`；改文本时前后未变的字保留原有时间。
-- **按假名定时**：带注音的字按注音的拍（小假名并入前一拍）细分，拖光标、时间线刻度（黄色短线）、打点和右侧表格都能逐拍调；没调过的拍在字内平均分。
-- **擦除速度**：每个字从自己的开始一直擦到下一个字开始（最后一个字到行结束），长音会慢慢滑过去；想让长音后停住，就把下一个字或行结束拖到实际位置。
+## Display rules
 
-## 逐字对齐（可选）
+- **Paragraphs.** A gap of at least the *auto-paragraph gap* since the previous lyric starts a new paragraph; you can also force a break with "start paragraph here". Within a paragraph, lines take turns on the row slots, and the next line appears once its slot is free. **Paragraphs never pre-show each other**: the next paragraph's lyrics do not appear before the last line of the previous one has been sung, and the new paragraph starts with count-in dots.
+- **Count-in dots.** Three dots count down before the first line of each paragraph. Each line can be forced on or off.
+- **Harmony / simultaneous rows.** "Duplicate as harmony row" places the copy on a free row slot (for example row 3), and every row wipes on its own timing at the same time. Row slot, alignment, and appear / disappear times can all be overridden per line.
+- **Furigana.** Write readings in the lyric text as `漢字{かんじ}`. When you edit the text, characters before and after the change keep their timing.
+- **Timing by kana beat.** A character with furigana is split into the beats of its reading (small kana join the previous beat). The cursor, the yellow ticks on the timeline, tap-to-time and the table on the right can all adjust each beat; beats you have not touched are spread evenly inside the character.
+- **Wipe speed.** Each character is wiped from its own start until the next character starts (the last character until the line's end), so a long note slides across slowly. To make a long note stop and hold, drag the next character or the line end to where it really is.
 
-浏览器里做不了强制对齐。`tools/align` 是生成示例数据用的 Python 参考脚本（demucs 分离人声 + torchaudio MMS_FA 对齐，
-日语用 pykakasi 生成注音），路径是写死的，使用前需自行修改。输出的 JSON 可直接「导入」。
+## Exporting
 
-## 测试
+**PNG sequence (transparent).** *Export* tab → choose frame rate (24 / 25 / 30 / 50 / 60), start and end seconds, and background (transparent or solid colour) → *Export PNG sequence to folder...* and pick an empty folder. Files are written as `lyrics_000001.png`, `lyrics_000002.png`, ... at the project resolution. *Save current frame* writes a single PNG. Folder export needs a Chromium-based browser (see [Browser support](#browser-support)).
 
-`bash tests/run.sh`：无头 Chrome 冒烟测试，输出的 JSON 里没有 `error` 字段即通过。
+**Premiere Pro.** File → Import, select the first image, and tick **Image Sequence**. If you exported from 0 s, place the clip at 0 s on the timeline and it lines up with the audio.
 
-## 已知限制
+**Single ProRes 4444 file with alpha** (match `-framerate` to the frame rate you exported):
 
-- 音视频和载入的字体文件不存进工程，重新打开后需再载入一次。
-- 导出到文件夹、读取本机字体需要 Chrome / Edge。
-- 超过 400MB 的媒体不生成波形。
+```bash
+ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le lyrics.mov
+```
+
+**Screen-recording mode.** The *Screen-recording mode* button in the top bar hides every panel and shows only the picture; press `Esc` to leave. With a transparent background, fill it with the key colour (*Style* tab) and remove that colour in your editor.
+
+## Optional: forced alignment
+
+A browser cannot do forced alignment, so `tools/align` provides Python scripts that separate the vocals (Demucs) and align an SRT to the singing per character (torchaudio MMS_FA; Japanese readings via pykakasi, Chinese via pypinyin). The result is a JSON file you import with *Import SRT / JSON...*. Alignment on singing is imprecise, so treat it as a first draft. See [tools/align/README.md](tools/align/README.md).
+
+## Browser support
+
+| Browser | Status |
+| --- | --- |
+| Chrome / Edge (desktop) | Fully supported |
+| Others (Firefox, Safari) | Not tested. **PNG sequence export to a folder** needs the File System Access API and **listing local fonts** needs the Local Font Access API; both are only available in Chromium-based browsers. Without the font API you can still type a font name in the CSS font-family field or load a font file |
+
+## Privacy
+
+Everything runs locally in your browser. Your audio / video, lyrics and projects are never uploaded anywhere, and the app has no backend and makes no network requests of its own. The autosave is kept in your browser's `localStorage` (clearing site data removes it). Save a `.kara.json` file if you want to keep your work.
+
+## Known limitations
+
+- Audio / video and loaded font files are not stored in the project; load them again after reopening.
+- Exporting to a folder and listing local fonts require Chrome or Edge.
+- Waveforms are not generated for media larger than 400 MB (sync is unaffected).
+- Forced alignment is not available in the browser; it needs the optional Python tools and gives rough results on singing.
+
+## Deploying to GitHub Pages
+
+The app is plain static files, so no build is needed.
+
+1. Push this repository to GitHub.
+2. Open **Settings → Pages**.
+3. Under *Build and deployment*, set **Source** to *Deploy from a branch*, choose your default branch and the **/ (root)** folder, then save.
+4. After a minute your site is available at `https://<your-github-username>.github.io/<repository-name>/`.
+
+The empty `.nojekyll` file makes GitHub Pages serve every file as-is.
+
+## Running the smoke test
+
+```bash
+bash tests/run.sh
+```
+
+It opens the app in headless Chrome, simulates a few interactions such as dragging the wipe cursor, and prints a JSON result; the test passes when the output contains no `error` field. The script looks for Chrome at the default Windows path; set the `CHROME` environment variable to point at another Chrome / Chromium binary (for example on Linux or macOS).
+
+## Third-party / content notice
+
+- The bundled sample lyrics in `samples/` are the author's own demo data for a fan song. They come without a warranty of any kind.
+- The sample projects reference a font named `SDK_JP_Web-Heavy`, which is **not** bundled. Without it installed, the text falls back to system fonts.
+
+## License
+
+[MIT](LICENSE) © 2026 Tsang

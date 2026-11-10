@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <title>Karaoke Lyrics Studio</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1b2b"/>
+      <stop offset="1" stop-color="#0d0d15"/>
+    </linearGradient>
+    <linearGradient id="wipe" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5c93"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+    <clipPath id="b1"><rect x="96" y="372" width="760" height="64" rx="32"/></clipPath>
+    <clipPath id="b2"><rect x="96" y="460" width="560" height="64" rx="32"/></clipPath>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <g transform="translate(0 28)">
+  <!-- icon -->
+  <g transform="translate(96 76) scale(0.3125)">
+    <rect width="512" height="512" rx="112" fill="#15151f" stroke="#2c2c44" stroke-width="8"/>
+    <clipPath id="i1"><rect x="72" y="164" width="368" height="76" rx="38"/></clipPath>
+    <clipPath id="i2"><rect x="72" y="304" width="272" height="76" rx="38"/></clipPath>
+    <g clip-path="url(#i1)"><rect x="72" y="164" width="368" height="76" fill="#e9e9f4"/><rect x="72" y="164" width="214" height="76" fill="url(#wipe)"/></g>
+    <g clip-path="url(#i2)"><rect x="72" y="304" width="272" height="76" fill="#8d8da8"/></g>
+    <rect x="279" y="128" width="14" height="148" rx="7" fill="#fff"/>
+    <circle cx="286" cy="128" r="22" fill="#fff"/>
+  </g>
+
+  <!-- names -->
+  <g font-family="'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans CJK SC', 'Noto Sans CJK JP', 'Microsoft YaHei', 'Yu Gothic', 'Hiragino Sans', sans-serif">
+    <text x="284" y="124" font-size="64" font-weight="700" fill="#ffffff">Karaoke Lyrics Studio</text>
+    <text x="286" y="176" font-size="34" fill="#c9c9dc">卡拉OK歌词工作室  ·  カラオケ歌詞スタジオ</text>
+  </g>
+
+  <!-- lyric wipe demo: shapes only -->
+  <g transform="translate(0 24)">
+  <g clip-path="url(#b1)">
+    <rect x="96" y="372" width="760" height="64" fill="#e9e9f4"/>
+    <rect x="96" y="372" width="430" height="64" fill="url(#wipe)"/>
+  </g>
+  <g clip-path="url(#b2)"><rect x="96" y="460" width="560" height="64" fill="#8d8da8"/></g>
+  <rect x="520" y="342" width="12" height="118" rx="6" fill="#ffffff"/>
+  <circle cx="526" cy="342" r="18" fill="#ffffff"/>
+
+  </g>
+
+  <!-- tagline -->
+  <g font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" fill="#a9a9c2" font-size="30">
+    <text x="96" y="276">Per-character wipe · furigana · timeline editor</text>
+    <text x="96" y="322">Transparent PNG-sequence export · runs entirely in your browser</text>
+  </g>
+  </g>
+</svg>

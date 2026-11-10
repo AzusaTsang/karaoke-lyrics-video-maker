@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Karaoke Lyrics Studio</title>
+  <defs>
+    <linearGradient id="wipe" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5c93"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </linearGradient>
+    <clipPath id="bar1"><rect x="72" y="164" width="368" height="76" rx="38"/></clipPath>
+    <clipPath id="bar2"><rect x="72" y="304" width="272" height="76" rx="38"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#15151f"/>
+  <!-- line 1: already sung (left, colour) / still to sing (right, light) -->
+  <g clip-path="url(#bar1)">
+    <rect x="72" y="164" width="368" height="76" fill="#e9e9f4"/>
+    <rect x="72" y="164" width="214" height="76" fill="url(#wipe)"/>
+  </g>
+  <!-- line 2: not sung yet -->
+  <g clip-path="url(#bar2)">
+    <rect x="72" y="304" width="272" height="76" fill="#8d8da8"/>
+  </g>
+  <!-- wipe cursor -->
+  <rect x="279" y="128" width="14" height="148" rx="7" fill="#ffffff"/>
+  <circle cx="286" cy="128" r="22" fill="#ffffff"/>
+</svg>

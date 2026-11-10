@@ -1,0 +1,14 @@
+# Forced-alignment tools for Karaoke Lyrics Studio (Python 3.9+)
+#
+# torch / torchaudio: a CUDA build is strongly recommended (CPU works but is much slower).
+#   Pick the right command on https://pytorch.org/get-started/locally/ BEFORE installing the rest, e.g.
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+# The MMS_FA alignment model (~1.2 GB) is downloaded automatically on the first run of align.py,
+# and the Demucs htdemucs weights on the first run of separate.py.
+torch
+torchaudio
+demucs
+soundfile
+pykakasi
+pypinyin
+numpy

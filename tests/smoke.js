@@ -64,6 +64,7 @@ window.addEventListener('load', async () => {
     out.blank = K.render(g, 5, { bg: 'none' }); out.drew = K.render(g, 28.5, { bg: 'none' }); out.cornerAlpha = g.getImageData(0, 0, 1, 1).data[3];
     // 保存 / 读回
     const p2 = K.normalizeProject(JSON.parse(JSON.stringify(K.project))); out.roundtrip = JSON.stringify(p2.lines) === JSON.stringify(K.project.lines);
+    { K.showTab("style"); await wait(100); const fp = document.getElementById("fontPick"); out.fontOpts = fp.options.length; fp.value = "Meiryo"; fp.dispatchEvent(new Event("change", { bubbles: true })); out.fontSet = K.S().font; K.undo(); }
     K.setProject(K.normalizeProject(K.SAMPLES[1].project)); out.fr = K.screen().ord.length;
     K.setProject(K.normalizeProject(K.SAMPLES[0].project)); const d = K.ops.dup(K.screen().ord[2]); K.seek(28.6); K.tl.scroll = 22; await wait(300);
   } catch (e) { out.error = String(e && e.stack || e); }

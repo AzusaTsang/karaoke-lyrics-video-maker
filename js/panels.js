@@ -106,8 +106,9 @@
   const FORMS = {
     'tab-style': [
       ['字体'],
-      { k: 'font', label: '字体族', type: 'text', list: 'fontList' },
-      { html: '<div class="row"><label></label><button id="bFonts">读取本机字体</button><button id="bFontFile">载入字体文件…</button><input id="fFont" type="file" accept=".ttf,.otf,.woff,.woff2" hidden></div>' },
+      { html: '<div class="row"><label>字体</label><select id="fontPick"></select></div>' },
+      { k: 'font', label: '字体族(CSS)', type: 'text' },
+      { html: '<div class="row"><label></label><button id="bFonts">读取本机全部字体</button><button id="bFontFile">载入字体文件…</button><input id="fFont" type="file" accept=".ttf,.otf,.woff,.woff2" hidden></div>' },
       { k: 'weight', label: '字重', type: 'select', opts: [['normal', '常规'], ['bold', '粗体'], ['900', '特粗']] },
       R('size', '字号', 20, 320, 1), R('rubyRatio', '注音比例', 0.2, 0.8, 0.01), R('rubyGap', '注音间距', -20, 60, 1), R('spacing', '字间距', -10, 40, 1),
       ['颜色（未唱 / 已唱）'],
@@ -153,17 +154,33 @@
         return '';
       }).join('');
     });
-    $('fontList').innerHTML = (K.localFonts || []).map((f) => `<option value="'${esc(f)}'">`).join('');
-    $('bFonts').onclick = async () => {
-      if (!window.queryLocalFonts) { K.toast('当前浏览器不支持读取本机字体，请直接输入字体名或载入字体文件'); return; }
-      try { K.localFonts = [...new Set((await window.queryLocalFonts()).map((f) => f.family))].sort(); $('fontList').innerHTML = K.localFonts.map((f) => `<option value="'${esc(f)}'">`).join(''); K.toast(`已读取 ${K.localFonts.length} 个字体，点「字体族」输入框从下拉里选`); } catch (e) { K.toast('读取字体被拒绝'); }
+    /* 字体下拉：常用字体 + 载入的字体文件 + （授权后）本机全部字体 */
+    const COMMON = ['Yu Gothic UI', 'Yu Gothic', 'Meiryo', 'MS Gothic', 'Yu Mincho', 'MS Mincho', 'BIZ UDGothic', 'Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi', 'Microsoft JhengHei', 'Malgun Gothic', 'Segoe UI', 'Arial', 'Arial Black', 'Impact', 'Georgia', 'Times New Roman', 'Consolas'];
+    const FALLBACK = "'Yu Gothic UI', 'Meiryo', 'Microsoft YaHei', sans-serif";
+    const firstFam = () => ((K.S().font.match(/^\s*(?:'([^']+)'|"([^"]+)"|([^,]+))/) || []).slice(1).find(Boolean) || '').trim();
+    const fillPick = () => {
+      const cur = firstFam(), grp = (label, arr) => (arr.length ? `<optgroup label="${label}">${arr.map((f) => `<option value="${esc(f)}"${f === cur ? ' selected' : ''}>${esc(f)}</option>`).join('')}</optgroup>` : '');
+      const loaded = K.userFonts || [], local = K.localFonts || [], known = new Set([...loaded, ...COMMON, ...local]);
+      $('fontPick').innerHTML = (cur && !known.has(cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}（当前）</option>` : '') + grp('已载入的字体文件', loaded) + grp('常用', COMMON) + grp('本机全部字体', local);
     };
+    fillPick();
+    $('fontPick').onchange = (e) => {
+      const f = e.target.value; K.S().font = `'${f}', ${FALLBACK}`;
+      $('tab-style').querySelector('[data-s="font"]').value = K.S().font; K.commit(); K.ensureFont();
+    };
+    $('tab-style').querySelector('[data-s="font"]').addEventListener('change', () => setTimeout(fillPick));
+    const readLocal = async (quiet) => {
+      try { K.localFonts = [...new Set((await window.queryLocalFonts()).map((f) => f.family))].sort(); fillPick(); if (!quiet) K.toast(`已读取 ${K.localFonts.length} 个本机字体，在「字体」下拉里选`); }
+      catch (e) { if (!quiet) K.toast('读取本机字体被拒绝（可在地址栏左侧的网站设置里重新允许）'); }
+    };
+    $('bFonts').onclick = () => { if (!window.queryLocalFonts) { K.toast('当前浏览器不支持读取本机字体，可在「字体族(CSS)」里直接输入字体名，或载入字体文件'); return; } readLocal(false); };
+    if (!K.localFonts && window.queryLocalFonts && navigator.permissions) navigator.permissions.query({ name: 'local-fonts' }).then((p) => { if (p.state === 'granted') readLocal(true); }).catch(() => {});
     $('bFontFile').onclick = () => $('fFont').click();
     $('fFont').onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;
       const name = f.name.replace(/\.[^.]+$/, '').replace(/[^\w\- ]/g, '') || 'UserFont';
       const ff = new FontFace(name, await f.arrayBuffer()); await ff.load(); document.fonts.add(ff);
-      K.S().font = `'${name}', ${K.S().font}`; K.commit(); buildForms(); K.ensureFont(); K.toast(`已载入字体「${name}」（字体文件不会存进工程，下次需重新载入或安装到系统）`);
+      (K.userFonts = K.userFonts || []).push(name); K.S().font = `'${name}', ${K.S().font}`; K.commit(); buildForms(); K.ensureFont(); K.toast(`已载入字体「${name}」（字体文件不会存进工程，下次需重新载入或安装到系统）`);
     };
   }
   function formEvents() {

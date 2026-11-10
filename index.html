@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卡拉OK歌词工作室</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <b class="brand">卡拉OK歌词工作室</b>
+    <input id="title" type="text" title="工程名称" spellcheck="false">
+    <span class="grp">
+      <button id="bNew" title="新建空工程（保留当前样式）">新建</button>
+      <button id="bOpen" title="打开工程文件 Ctrl+O">打开…</button>
+      <button id="bSave" class="pri" title="保存到工程文件 Ctrl+S">保存</button>
+      <button id="bSaveAs" title="Ctrl+Shift+S">另存为…</button>
+    </span>
+    <span class="grp">
+      <button id="bImport" title="导入 SRT 字幕，或对齐脚本输出的 JSON">导入 SRT / JSON…</button>
+      <select id="samples" title="载入内置示例"><option value="">示例…</option></select>
+      <button id="bMedia" title="载入用于同步的音频或视频（也可直接把文件拖进窗口）">载入音视频…</button>
+      <span id="mediaName" class="hint">未载入音视频</span>
+    </span>
+    <span class="grp right">
+      <button id="bUndo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="bRedo" title="重做 Ctrl+Y">↷ 重做</button>
+      <button id="bRec" title="隐藏界面只显示画面，用于录屏；Esc 退出">录屏模式</button>
+    </span>
+  </header>
+
+  <aside id="left">
+    <h3><span>歌词行</span><button id="bAdd" title="在播放头处添加一行">＋ 添加</button></h3>
+    <div id="list"></div>
+  </aside>
+
+  <main id="center">
+    <div id="stageBox"><canvas id="cv" width="1920" height="1080"></canvas></div>
+    <div id="bar">
+      <button id="bPlay" class="pri" title="空格">▶</button>
+      <span id="tm">0:00.00 / 0:00.00</span>
+      <span class="seg" id="tool" title="拖动预览里的擦除光标时做什么">
+        <button data-v="retime" class="on" title="暂停在某一刻，把光标拖到此刻实际唱到的字上 → 该字的开始时间 = 当前时间">拖光标：校时</button><button data-v="scrub" title="拖动光标 = 沿着这句歌词前后浏览时间">拖光标：浏览</button>
+      </span>
+      <span class="hint">空格 播放 · T 打点 · ↑↓ 选行 · P 分段 · D 预备点 · H 和声行 · 1-4 行位 · [ ] 微移</span>
+      <span class="right"><button id="bZout" title="时间线缩小（Ctrl+滚轮）">－</button><button id="bZin" title="时间线放大（Ctrl+滚轮）">＋</button></span>
+    </div>
+  </main>
+
+  <aside id="right">
+    <div id="tabs"><button data-t="line" class="on">行</button><button data-t="style">样式</button><button data-t="layout">版面</button><button data-t="export">导出</button></div>
+    <div id="tab-line" class="tab"></div>
+    <div id="tab-style" class="tab" hidden></div>
+    <div id="tab-layout" class="tab" hidden></div>
+    <div id="tab-export" class="tab" hidden>
+      <h4>PNG 序列（带透明通道）</h4>
+      <div class="row"><label>帧率</label><select id="s_fps"><option>24</option><option>25</option><option>30</option><option>50</option><option>60</option></select></div>
+      <div class="row"><label>起止(s)</label><input id="eStart" type="number" step="0.1" value="0"><input id="eEnd" type="number" step="0.1"></div>
+      <div class="row"><label>背景</label><select id="eBg"><option value="transparent">透明</option><option value="color">纯色背景</option></select></div>
+      <div class="btns"><button id="bPng" class="pri">导出 PNG 序列到文件夹…</button><button id="bFrame">保存当前帧</button><button id="bCancel" hidden>取消</button></div>
+      <div id="prog"><i></i></div><div class="hint" id="expMsg"></div>
+      <div class="hint">Premiere：文件 → 导入，选第一张并勾选「图像序列」。从 0 秒导出时，放在时间线 0 秒处即对齐。<br>转成单个 ProRes 4444：<br><code>ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le lyrics.mov</code></div>
+      <h4>录屏</h4>
+      <div class="hint">顶部「录屏模式」会隐藏全部界面；透明背景时用「样式 → 抠像色」铺底，录完在剪辑软件里抠掉。</div>
+    </div>
+  </aside>
+
+  <section id="tl"><canvas id="tlc"></canvas></section>
+</div>
+<div id="menu" hidden></div>
+<div id="toast" hidden></div>
+<datalist id="fontList"></datalist>
+<input id="fOpen" type="file" hidden>
+<video id="media" playsinline hidden></video>
+
+<script src="js/state.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ops.js"></script>
+<script src="js/stage.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/panels.js"></script>
+<script>window.K.SAMPLES = [];</script>
+<script src="samples/hydro_king_jp.js"></script>
+<script src="samples/hydro_king_fr.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

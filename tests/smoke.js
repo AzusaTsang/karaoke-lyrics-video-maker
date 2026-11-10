@@ -22,7 +22,10 @@ window.addEventListener('load', async () => {
     K.undo(); out.retimeUndo = K.line(l.id).units[k].s === before;
     // ---- B. 浏览模式 ----
     K.ui.tool = 'scrub'; const L2 = K.line(l.id); K.seek(T0); await wait(50);
-    ev(cv, 'pointerdown', x, y); ev(cv, 'pointermove', x2, y); ev(cv, 'pointerup', x2, y);
+    { const I2 = K.screen().info.get(L2.id), G2 = K.geo(L2, I2, cv.width, cv.height), e2 = G2.x0 + K.progressEdge(L2, G2.L, K.now()) * G2.s;
+      const [bx, by] = toClient(e2, G2.y - K.S().size * 0.4), [bx2] = toClient(G2.x0 + G2.L.units[k].x * G2.s + 1, 0);
+      out.scrubDbg = { nowBefore: K.now(), coordShift: +(bx - x).toFixed(1), sel: K.ui.sel === L2.id };
+      ev(cv, 'pointerdown', bx, by); ev(cv, 'pointermove', bx2, by); ev(cv, 'pointerup', bx2, by); }
     out.scrub = { now: +K.now().toFixed(3), expect: L2.units[k].s }; K.ui.tool = 'retime';
     // ---- C. 时间线 ----
     K.tl.pps = 80; K.tl.scroll = 24; await wait(100);

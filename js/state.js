@@ -14,8 +14,43 @@
     bgMode: 'transparent', bgColor: '#101820', keyColor: '#00ff00', useVideoBg: false, fps: 60,
   };
 
+  /* 设置项的合法范围 / 取值（读工程文件、界面输入时都用它清洗，未知项丢弃） */
+  K.RANGE = {
+    size: [4, 1000], rubyRatio: [0, 2], rubyGap: [-500, 500], spacing: [-200, 500], lineGap: [-1, 5],
+    strokeW: [0, 200], rubyStrokeW: [0, 200], glow: [0, 500], W: [16, 7680, 1], H: [16, 7680, 1], posY: [-1, 2], maxW: [0.05, 1],
+    marginX: [0, 0.5], preShow: [0, 60], paraGap: [0, 120], dotsDur: [0, 30], dotSize: [0.01, 3],
+    lead: [0, 30], hold: [0, 30], fadeIn: [0, 10], fadeOut: [0, 10], offset: [-60, 60],
+  };
+  K.ENUM = { weight: ['normal', 'bold', '900'], layout: ['duet', 'stack'], bgMode: ['transparent', 'color'], rows: [1, 2, 3], fps: [24, 25, 30, 50, 60] };
+  const COLOR_RE = /^#[0-9a-f]{6}$/i;
+  /* 返回清洗后的值；不合法时返回 undefined（调用方回退默认值） */
+  K.cleanSetting = (k, v) => {
+    const d = K.DEF[k];
+    if (d === undefined) return undefined;
+    if (K.ENUM[k]) { const e = K.ENUM[k].find((x) => String(x) === String(v)); return e; }
+    if (typeof d === 'boolean') return typeof v === 'string' ? v === 'true' || v === '1' : !!v;
+    if (typeof d === 'number') {
+      v = typeof v === 'string' && v.trim() !== '' ? +v : v;
+      if (typeof v !== 'number' || !isFinite(v)) return undefined;
+      const r = K.RANGE[k]; if (r) { v = Math.max(r[0], Math.min(r[1], v)); if (r[2]) v = Math.round(v); }
+      return v;
+    }
+    if (COLOR_RE.test(d)) return typeof v === 'string' && COLOR_RE.test(v) ? v.toLowerCase() : undefined;
+    if (k === 'font') { if (typeof v !== 'string') return undefined; v = v.replace(/[\u0000-\u001f<>{};\\]/g, '').slice(0, 300).trim(); return v || undefined; }
+    return typeof v === 'string' ? v : undefined;
+  };
+  K.cleanSettings = (src) => {
+    const S = Object.assign({}, K.DEF);
+    if (src && typeof src === 'object') Object.keys(K.DEF).forEach((k) => { if (Object.prototype.hasOwnProperty.call(src, k)) { const v = K.cleanSetting(k, src[k]); if (v !== undefined) S[k] = v; } });
+    return S;
+  };
+  /* HTML 转义：所有拼进 innerHTML 的值（包括属性值）都要过一遍 */
+  K.esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
   K.project = null;
   K.rev = 0;               // 任何改动都会 +1，用于失效缓存
+  K.inv = 0;               // 不改数据、但画面需要重画时 +1（语言、媒体帧、波形…）
+  K.invalidate = () => { K.inv++; };
   K.dirty = false;
   K.ui = { sel: null, tool: 'retime', tapIdx: 0 };
   K.S = () => K.project.settings;
@@ -121,39 +156,58 @@
   };
 
   /* ---------- 工程 ---------- */
-  K.blank = () => ({ app: 'karaoke-studio', version: 1, title: '未命名', duration: 60, mediaName: '', settings: Object.assign({}, K.DEF), lines: [] });
+  K.blank = () => ({ app: 'karaoke-studio', version: 1, title: K.t ? K.t('untitled') : '未命名', duration: 60, mediaName: '', settings: Object.assign({}, K.DEF), lines: [] });
   K.sortLines = () => K.project.lines.sort((a, b) => K.ls(a) - K.ls(b));
 
+  /* 工程文件不可信：逐项校验 / 转换类型 */
+  const num = (v, d) => { v = typeof v === 'string' && v.trim() !== '' ? +v : v; return typeof v === 'number' && isFinite(v) ? v : d; };
+  const str = (v, max) => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, max) : '');
+  const tri = (v) => (v == null ? null : typeof v === 'string' ? v === 'true' || v === '1' : !!v);
+  const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
   /* 接受：工程文件 / 对齐脚本输出的数组 [{start,end,text,units:[{t,r,t0,t1}]}] */
   K.normalizeProject = (j) => {
     const p = K.blank();
     if (Array.isArray(j)) j = { lines: j };
-    if (j.title) p.title = j.title;
-    if (j.mediaName) p.mediaName = j.mediaName;
-    Object.assign(p.settings, j.settings || {});
-    let maxEnd = 0;
-    (j.lines || []).forEach((c) => {
-      const l = K.newLine({ id: c.id && typeof c.id === 'string' ? c.id : K.newId() });
-      ['row', 'align', 'newPara', 'dots', 'showAt', 'hideAt'].forEach((k) => { if (c[k] != null) l[k] = c[k]; });
+    if (!j || typeof j !== 'object') j = {};
+    if (str(j.title, 200).trim()) p.title = str(j.title, 200);
+    p.mediaName = str(j.mediaName, 260);
+    p.settings = K.cleanSettings(j.settings);
+    let maxEnd = 0; const ids = new Set();
+    (Array.isArray(j.lines) ? j.lines : []).forEach((c) => {
+      if (!c || typeof c !== 'object') return;
+      const start = Math.max(0, num(c.start, 0)), cend = num(c.end, 0);
+      const l = K.newLine({ id: typeof c.id === 'string' && ID_RE.test(c.id) && !ids.has(c.id) ? c.id : K.newId() });
+      ids.add(l.id);
+      const row = num(c.row, null); if (row != null) l.row = Math.max(0, Math.min(5, Math.round(row)));
+      if (['left', 'center', 'right'].includes(c.align)) l.align = c.align;
+      l.newPara = tri(c.newPara); l.dots = tri(c.dots);
+      l.showAt = num(c.showAt, null); l.hideAt = num(c.hideAt, null);
       let prev = null;
-      (c.units || []).forEach((u) => {
+      (Array.isArray(c.units) ? c.units : []).forEach((u) => {
         if (Array.isArray(u)) u = { t: u[0], r: u[1], t0: u[2], t1: u[3] };
-        const n = { t: u.t, r: u.r || null };
-        if (u.s != null) { n.s = u.s; if (u.m) n.m = u.m.slice(); }
-        else {
-          n.s = u.t0 != null ? u.t0 : prev ? prev._t1 : c.start || 0;
-          n._t1 = u.t1 != null ? u.t1 : n.s;
+        if (!u || typeof u !== 'object') return;
+        const n = { t: str(u.t, 64), r: str(u.r, 64) || null };
+        if (!n.t) return;
+        const fb = prev ? (prev._t1 != null ? prev._t1 : prev.s) : start;
+        if (u.s != null) {
+          n.s = num(u.s, fb);
+          if (Array.isArray(u.m)) { const m = u.m.map((v) => num(v, NaN)); if (m.every(isFinite)) n.m = m; }
+        } else {
+          n.s = num(u.t0, fb);
+          n._t1 = num(u.t1, n.s);
         }
         l.units.push(n); prev = n;
       });
-      if (!l.units.length && c.text) { l.units = K.parseText(c.text); l.end = c.end || 0; l.units.forEach((u) => (u.s = c.start || 0)); K.evenSplit(l, c.start || 0, c.end || (c.start || 0) + 3); }
+      const text = str(c.text, 2000), fromText = !l.units.length && !!text;
+      if (fromText) { l.units = K.parseText(text); l.units.forEach((u) => (u.s = start)); K.evenSplit(l, start, cend > start ? cend : start + 3); }
       const last = l.units[l.units.length - 1];
-      l.end = last && last._t1 != null ? Math.max(last._t1 + 0.08, c.end || 0) : c.end || 0;   // 对齐数据用最后一个字的结束；工程文件用自带的 end
+      if (!fromText) l.end = last && last._t1 != null ? Math.max(last._t1 + 0.08, cend) : cend;   // 对齐数据用最后一个字的结束；工程文件用自带的 end；SRT 用 evenSplit 的结束
       l.units.forEach((u) => delete u._t1);
       if (!l.units.length) return;
       K.fixLine(l); p.lines.push(l); maxEnd = Math.max(maxEnd, l.end);
     });
-    p.duration = j.duration || Math.ceil(maxEnd + 5);
+    const dur = num(j.duration, 0);
+    p.duration = dur > 0 ? Math.min(dur, 86400) : Math.ceil(maxEnd + 5);
     return p;
   };
 
@@ -180,6 +234,6 @@
 
   K.setProject = (p, keepDirty) => {
     K.project = p; K.ui.sel = null; K.rev++; K.dirty = !!keepDirty; K.resetHistory();
-    K.emit('load'); K.emit('change'); K.emit('select'); K.autosave();
+    K.emit('load', 'project'); K.emit('change'); K.emit('select'); K.autosave();
   };
 })();

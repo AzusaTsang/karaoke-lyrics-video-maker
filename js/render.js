@@ -193,4 +193,6 @@
     try { await Promise.all([document.fonts.load(K.fontBase(), sample), document.fonts.load(K.fontRuby(), 'あいう')]); } catch (e) {}
     K.fontEpoch++;
   };
+  /* 字体随时可能加载完（如画布第一次用到某个网页字体）：让排版缓存和画面失效 */
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { K.fontEpoch++; });
 })();

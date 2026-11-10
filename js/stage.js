@@ -50,17 +50,25 @@
       move(e);
     });
     cv.addEventListener('pointermove', move);
-    const up = () => { if (drag) { if (drag.mode === 'retime' && drag.changed) K.commit(); drag = null; } };
+    const up = () => { if (drag) { if (drag.mode === 'retime' && drag.changed) K.commit(); drag = null; K.invalidate(); } };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   };
 
+  /* 每帧调用；时间 / 数据 / 字体 / 选中 / 显示尺寸 / 录屏模式都没变就跳过。拖动中、视频背景播放中总是重画 */
+  let lastKey = '';
+  K.stats = K.stats || { stage: 0, tl: 0 };
   K.drawStage = (video) => {
     const S = K.S(), rec = document.body.classList.contains('rec');
-    if (cv.width !== S.W || cv.height !== S.H) { cv.width = S.W; cv.height = S.H; }
+    let resized = false;
+    if (cv.width !== S.W || cv.height !== S.H) { cv.width = S.W; cv.height = S.H; resized = true; }
+    const vbg = !!(S.useVideoBg && video && video.videoWidth);
+    const key = [K.now(), K.rev, K.inv, K.fontEpoch, K.ui.sel, rec, cv.clientWidth, cv.clientHeight, window.devicePixelRatio, vbg && video.readyState].join('|');
+    if (key === lastKey && !resized && !drag && !(vbg && !video.paused)) return false;
+    lastKey = key; K.stats.stage++;
     let bg = S.bgMode === 'color' ? 'color' : rec ? 'key' : 'none';
-    if (S.useVideoBg && video && video.videoWidth) bg = 'video';
+    if (vbg) bg = 'video';
     K.render(ctx, K.now(), { bg, video });
-    if (rec) return;
+    if (rec) return true;
     /* ---- 编辑用叠加层（不会出现在导出里） ---- */
     const t = te(), U = u(), g = ctx;
     K.visible(t, cv.width, cv.height).forEach((v) => {
@@ -78,5 +86,6 @@
       g.beginPath(); g.arc(ex, bot + 19 * U, 7 * U, 0, Math.PI * 2); g.fill(); g.stroke();
       g.restore();
     });
+    return true;
   };
 })();

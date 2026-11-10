@@ -10,7 +10,7 @@
   ops.shift = (l, d) => { shiftLine(l, d); K.commit(); };
   ops.even = (l) => { K.evenSplit(l); K.commit(); };
   ops.add = (t) => {
-    const l = K.newLine({ units: K.parseText('新歌词'), end: t + 2 });
+    const l = K.newLine({ units: K.parseText(K.t('newLyric')), end: t + 2 });
     l.units.forEach((u) => (u.s = t)); K.evenSplit(l, t, t + 2);
     K.project.lines.push(l); K.commit(); K.select(l.id); return l;
   };
@@ -28,11 +28,17 @@
     K.project.lines.push(n); K.commit(); K.select(n.id); return n;
   };
   /* 在时间 t 处把一行拆成两行 */
+  /* 拆分处的空白字直接丢掉：新行不以空白开头，前一行也不以空白结尾；其余时间原样保留（本来就单调） */
   ops.split = (l, t) => {
+    const blank = (u) => !u.t.trim();
     const k = l.units.findIndex((u) => u.s >= t);
     if (k <= 0) return null;
-    const n = K.newLine({ units: l.units.splice(k), end: l.end, row: null });
-    while (n.units.length > 1 && !n.units[0].t.trim()) { const sp = n.units.shift(); n.units[0].s = Math.min(n.units[0].s, Math.max(sp.s, n.units[0].s)); }
+    let a = k, b = k;
+    while (a > 0 && blank(l.units[a - 1])) a--;
+    while (b < l.units.length && blank(l.units[b])) b++;
+    if (a === 0 || b === l.units.length) return null;          // 一侧只剩空白，不拆
+    const n = K.newLine({ units: l.units.slice(b), end: l.end, row: null });
+    l.units = l.units.slice(0, a);
     l.end = Math.min(l.end, Math.max(t, l.units[l.units.length - 1].s + 0.05));
     K.fixLine(l); K.fixLine(n);
     K.project.lines.push(n); K.commit(); return n;

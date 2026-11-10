@@ -1,6 +1,7 @@
 /* 时间线：每个行位一条轨道；块 = 一句歌词（浅色=显示窗口，实色=演唱区间） */
 (function () {
   const K = window.K, RUL = 22, TRK = 46;
+  const LYR = '"Yu Gothic UI","Meiryo","Hiragino Sans","Microsoft YaHei","PingFang SC","Noto Sans CJK JP",sans-serif';   // 歌词本身（与界面语言无关）
   const tl = (K.tl = { pps: 80, scroll: 0 });
   let cv, g, W = 0, H = 0, drag = null;
   const wave = () => (K.peaks ? 40 : 0), top0 = () => RUL + wave();
@@ -77,7 +78,7 @@
       e.preventDefault();
       const r = cv.getBoundingClientRect(), h = hit(e.clientX - r.left, e.clientY - r.top);
       if (h.l) { K.select(h.l.id); K.lineMenu(h.l, e.clientX, e.clientY); }
-      else if (h.zone === 'empty') K.menu(e.clientX, e.clientY, [['在此处添加歌词行', () => { const l = K.ops.add(Math.max(0, K.r3(h.t))); if (h.row >= K.S().rows || h.row > 0) K.ops.set(l, 'row', h.row); }]]);
+      else if (h.zone === 'empty') K.menu(e.clientX, e.clientY, [[K.t('menu.add'), () => { const l = K.ops.add(Math.max(0, K.r3(h.t))); if (h.row >= K.S().rows || h.row > 0) K.ops.set(l, 'row', h.row); }]]);
     });
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -90,18 +91,26 @@
   K.tlZoom = (f) => { const c = T(W / 2); tl.pps = Math.max(8, Math.min(1200, tl.pps * f)); tl.scroll = Math.max(-1, c - W / 2 / tl.pps); };
   K.tlReveal = (t) => { const x = X(t); if (x < 40 || x > W - 80) tl.scroll = Math.max(-1, t - (W * 0.25) / tl.pps); };
 
+  /* 每帧调用；画面相关的状态都没变就跳过（拖动中总是重画） */
+  let lastKey = '';
+  K.stats = K.stats || { stage: 0, tl: 0 };
   K.drawTimeline = () => {
     const box = cv.parentElement, dpr = window.devicePixelRatio || 1, sc = K.screen();
     W = box.clientWidth; H = Math.max(box.clientHeight, top0() + sc.rows * TRK + 4);
-    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; }
+    let resized = false;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; resized = true; }
     const now = K.now();
     if (K.playing() && !drag && performance.now() - (tl.userScroll || 0) > 1500) { const x = X(now); if (x > W * 0.85 || x < 0) tl.scroll = now - (W * 0.15) / tl.pps; }
+    const key = [now, K.rev, K.inv, K.fontEpoch, K.ui.sel, K.ui.tapIdx, K.ui.tapArmed, tl.pps, tl.scroll, W, H, dpr].join('|');
+    if (key === lastKey && !resized && !drag) return false;
+    lastKey = key; K.stats.tl++;
+    const UF = K.uiFont(11), LF = '12px ' + LYR;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = '#15181d'; g.fillRect(0, 0, W, H);
     /* 标尺 */
     g.fillStyle = '#1c2027'; g.fillRect(0, 0, W, RUL);
     const steps = [0.1, 0.5, 1, 2, 5, 10, 30, 60], step = steps.find((s) => s * tl.pps >= 64) || 120;
-    g.font = '11px "Segoe UI",sans-serif'; g.textBaseline = 'middle'; g.fillStyle = '#8b93a1'; g.strokeStyle = '#2c313a'; g.lineWidth = 1;
+    g.font = UF; g.textBaseline = 'middle'; g.fillStyle = '#8b93a1'; g.strokeStyle = '#2c313a'; g.lineWidth = 1;
     for (let t = Math.max(0, Math.floor(tl.scroll / step) * step); t < T(W); t += step) {
       const x = Math.round(X(t)) + 0.5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.fillText(fmt(t), x + 4, RUL / 2);
     }
@@ -117,7 +126,7 @@
     /* 轨道 */
     for (let r = 0; r < sc.rows; r++) {
       const y = top0() + r * TRK; g.fillStyle = r % 2 ? '#181b21' : '#1a1e25'; g.fillRect(0, y, W, TRK);
-      g.fillStyle = '#4a5261'; g.fillText('行' + (r + 1), 4, y + 9);
+      g.fillStyle = '#4a5261'; g.fillText(K.t('tl.row', { n: r + 1 }), 4, y + 9);
     }
     const t0 = LT(-50), t1 = LT(W + 50);
     sc.ord.forEach((l) => {
@@ -134,7 +143,7 @@
       if (I.dotsDur) { g.fillStyle = '#ffd84d'; const xd = LX(s - I.dotsDur); for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(xd + ((x1 - xd) * (i + 0.5)) / 3, y + h / 2, 3, 0, 6.3); g.fill(); } }
       g.save(); g.beginPath(); g.rect(x1, y, Math.max(2, x2 - x1), h); g.clip();
       if (sel) {
-        g.strokeStyle = 'rgba(255,255,255,.75)'; g.fillStyle = '#fff'; g.font = '12px "Yu Gothic UI","Microsoft YaHei",sans-serif';
+        g.strokeStyle = 'rgba(255,255,255,.75)'; g.fillStyle = '#fff'; g.font = LF;
         l.units.forEach((u, i) => {
           const x = Math.round(LX(u.s)) + 0.5, nx = LX(K.unitEnd(l, i));
           g.beginPath(); g.moveTo(x, y + h * 0.5); g.lineTo(x, y + h); g.stroke();
@@ -142,11 +151,12 @@
           K.subTimes(l, i).slice(1, -1).forEach((tm) => { const xm = Math.round(LX(tm)) + 0.5; g.save(); g.strokeStyle = 'rgba(255,216,77,.8)'; g.beginPath(); g.moveTo(xm, y + h * 0.68); g.lineTo(xm, y + h); g.stroke(); g.restore(); });
           if (K.ui.tapArmed && (K.bounds(l)[K.ui.tapIdx] || {}).i === i) { g.fillStyle = '#ffd84d'; g.fillRect(x - 1, y + h - 4, Math.max(3, nx - x), 4); g.fillStyle = '#fff'; }
         });
-      } else { g.fillStyle = '#d5dae3'; g.font = '12px "Yu Gothic UI","Microsoft YaHei",sans-serif'; g.fillText(K.lineText(l), x1 + 4, y + h / 2); }
-      g.restore(); g.font = '11px "Segoe UI",sans-serif';
+      } else { g.fillStyle = '#d5dae3'; g.font = LF; g.fillText(K.lineText(l), x1 + 4, y + h / 2); }
+      g.restore(); g.font = UF;
     });
     /* 播放头 */
     const xp = Math.round(X(now)) + 0.5; g.strokeStyle = '#ff5a5a'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(xp, 0); g.lineTo(xp, H); g.stroke();
     g.fillStyle = '#ff5a5a'; g.beginPath(); g.moveTo(xp - 5, 0); g.lineTo(xp + 5, 0); g.lineTo(xp, 7); g.fill();
+    return true;
   };
 })();

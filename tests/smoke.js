@@ -13,6 +13,29 @@ window.addEventListener('load', async () => {
   const key = (el, k, code) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: code || k, bubbles: true, cancelable: true }));
   const HAN = /[㐀-鿿]/;
   try {
+    /* ---- 0. 第一次打开：示例在背后、欢迎页在上面；关掉后第二次打开不再出现 ---- */
+    { await frames(2);
+      const wd = document.querySelector('dialog.welcome');
+      out.first = { open: !!(wd && wd.open), src: K.doc.src, dirty: K.dirty, lines: K.project.lines.length, visible: K.visible(K.now() - K.S().offset, 1920, 1080).length };
+      ok('welcomeOnFirstRun', out.first.open && K.modalOpen(), out.first);
+      ok('sampleBehindWelcome', out.first.src === 'sample' && !out.first.dirty && out.first.lines > 10 && out.first.visible > 0, out.first);
+      const acts = [...document.querySelectorAll('#welcomeActions [data-act]')].map((b) => b.dataset.act);
+      ok('welcomeActions', ['sample', 'import', 'open', 'empty'].every((a) => acts.includes(a)) && acts.length === K.welcomeActions.filter((a) => a.where.includes('welcome')).length, acts);
+      ok('welcomeFocusInside', wd && wd.contains(document.activeElement));
+      key(document.body, ' ', 'Space'); await frames(1); ok('noShortcutsUnderModal', !K.playing());
+      wd.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await frames(1);
+      ok('welcomeEscCloses', !document.querySelector('dialog.welcome') && !K.modalOpen() && K.pref('welcomed') === true);
+      // 第二次打开（同一浏览器，有 welcomed 标记、无自动保存）：用 iframe 真正再启动一次
+      const boot = async () => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-3000px;width:1200px;height:800px'; f.src = 'index.html';
+        const ld = new Promise((r) => (f.onload = r)); document.body.appendChild(f); await ld; await wait(50);
+        let r = null; try { const w = f.contentWindow; r = { welcome: !!w.document.querySelector('dialog.welcome'), boot: !!(w.K && w.K.project) }; } catch (e) { r = { err: String(e) }; }
+        f.remove(); return r; };
+      out.second = await boot();
+      ok('noWelcomeOnSecondRun', out.second && out.second.boot && out.second.welcome === false, out.second);
+      localStorage.removeItem('karaoke-studio:prefs'); out.again = await boot();
+      ok('welcomeAgainAfterClear', out.again && out.again.welcome === true, out.again);
+      delete K.prefs.welcomed; ok('firstRunLogic', K.firstRun(false) === true && K.firstRun(true) === false); K.prefs.welcomed = true; }
+
     localStorage.clear(); K.setLang('zh-CN');
     K.setProject(K.normalizeProject(K.SAMPLES[0].project)); await K.ensureFont(); await wait(200);
     const S = K.S(), cv = document.getElementById('cv'), tlc = document.getElementById('tlc');
@@ -67,7 +90,7 @@ window.addEventListener('load', async () => {
 
     // ---- C. 时间线 ----
     K.tl.pps = 80; K.tl.scroll = 24; await wait(100);
-    const r = tlc.getBoundingClientRect(), TX = (t) => r.left + (t - K.tl.scroll) * 80, top0 = 22, TRK = 46;
+    const r = tlc.getBoundingClientRect(), TX = (t) => r.left + K.tl.gut + (t - K.tl.scroll) * 80, top0 = 22, TRK = 46;
     let cur = K.line(l.id), Ic = K.screen().info.get(cur.id), yb = r.top + top0 + Ic.row * TRK + 12, s0 = K.ls(cur);
     ev(tlc, 'pointerdown', TX(s0 + 0.5), yb); ev(tlc, 'pointermove', TX(s0 + 0.5) + 80, yb); ev(tlc, 'pointerup', TX(s0 + 0.5) + 80, yb);
     out.move = +(K.ls(K.line(l.id)) - s0).toFixed(3); ok('tlMove', near(out.move, 1, 1e-3), out.move); K.undo();
@@ -143,7 +166,7 @@ window.addEventListener('load', async () => {
         // 占位符在各语言里一致
         ok('i18nParams:' + lg, base.every((x) => JSON.stringify((D['zh-CN'][x].match(/\{\w+\}/g) || []).sort()) === JSON.stringify(((D[lg][x] || '').match(/\{\w+\}/g) || []).sort())), lg); });
       // 每个 data-i18n* 引用的 key 都存在
-      const used = [...document.querySelectorAll('[data-i18n],[data-i18n-title],[data-i18n-placeholder]')].flatMap((el) => [el.dataset.i18n, el.dataset.i18nTitle, el.dataset.i18nPlaceholder]).filter(Boolean);
+      const used = [...document.querySelectorAll('[data-i18n],[data-i18n-title],[data-i18n-placeholder],[data-i18n-aria]')].flatMap((el) => [el.dataset.i18n, el.dataset.i18nTitle, el.dataset.i18nPlaceholder, el.dataset.i18nAria]).filter(Boolean);
       ok('i18nHtmlKeysExist', used.every((x) => x in D['zh-CN']), used.filter((x) => !(x in D['zh-CN'])));
       // 插值
       for (const lg of langs) { K.setLang(lg);
@@ -174,7 +197,7 @@ window.addEventListener('load', async () => {
         K.showTab(t); await wait(60);
         const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
         while (w.nextNode()) { const nd = w.currentNode, el = nd.parentElement;
-          if (!el || el.closest('#list, td, textarea, script, pre, #toast, #fontPick, #lang, [hidden]') || el.closest('.tab[hidden]')) continue;
+          if (!el || el.closest('#list, td, textarea, script, pre, #toasts, #fontPick, #lang, [hidden]') || el.closest('.tab[hidden]')) continue;
           if (HAN.test(nd.nodeValue.replace('漢字{かんじ}', ''))) leftovers.push(nd.nodeValue.trim().slice(0, 40)); }
         document.querySelectorAll('[title],[placeholder]').forEach((el) => { if (!el.closest('#list, #fontPick') && (HAN.test(el.title || '') || HAN.test(el.placeholder || ''))) leftovers.push('@' + (el.title || el.placeholder).slice(0, 40)); });
       }
@@ -207,6 +230,161 @@ window.addEventListener('load', async () => {
       key(document.body, ' ', 'Space'); await wait(20); ok('spaceOnBodyPlays', K.playing()); K.pause();
       b.focus(); b.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })); ok('mouseClickBlursButton', document.activeElement !== b); }
 
+    // ---- I. 事件取消订阅 ----
+    { let c = 0; const f = () => c++, un = K.on('__t', f); K.emit('__t'); un(); K.emit('__t');
+      K.on('__t', f); K.off('__t', f); K.emit('__t');
+      let d = 0; const g1 = () => { d++; K.off('__t', g1); }, g2 = () => d++; K.on('__t', g1); K.on('__t', g2); K.emit('__t'); K.emit('__t');
+      ok('offUnsubscribes', c === 1 && d === 3, [c, d]); }
+
+    // ---- J. 快捷键表 = 帮助 = 实际处理 ----
+    { K.setProject(K.normalizeProject(K.SAMPLES[0].project), false, { src: 'sample' }); await wait(50);
+      const ev = (spec) => { const p = spec.split('+'), tok = p.pop(), ctrl = p.includes('Ctrl'), shift = p.includes('Shift');
+        const SH = { '[': '{', ']': '}', ',': '<', '.': '>' }, k = tok === 'Space' ? ' ' : /^[A-Z]$/.test(tok) ? (shift ? tok : tok.toLowerCase()) : shift && SH[tok] ? SH[tok] : tok;
+        return new KeyboardEvent('keydown', { key: k, code: tok === 'Space' ? 'Space' : /^[A-Z]$/.test(tok) ? 'Key' + tok : '', ctrlKey: ctrl, shiftKey: shift, bubbles: true, cancelable: true }); };
+      const bad = [];
+      K.KEYS.forEach((b) => b.k.forEach((spec, i) => { const m = K.matchKey(ev(spec)); if (!m || m.b !== b || m.i !== i) bad.push(spec + '→' + (m ? m.b.label : 'none')); }));
+      ok('everyBoundKeyMatchesItsRow', !bad.length, bad);
+      ok('altIgnored', K.matchKey(new KeyboardEvent('keydown', { key: 'l', altKey: true })) === null);
+      ok('jisBracketShift', (K.matchKey(new KeyboardEvent('keydown', { key: '{', shiftKey: true })) || {}).b === K.KEYS.find((b) => b.label === 'k.nudge5'));
+      ok('helpLabelsTranslated', K.KEYS.every((b) => K.has(b.label) && (!b.hint || K.has(b.hint)) && K.KEY_GROUPS.includes(b.grp)));
+      key(document.body, '?', 'Slash'); await frames(1);
+      const hd = document.querySelector('dialog.help');
+      const rows = hd ? [...hd.querySelectorAll('tr[data-key-id]')].map((r) => r.dataset.keyId) : [];
+      ok('helpOpensWithQuestion', !!(hd && hd.open), !!hd);
+      ok('helpCoversEveryBinding', rows.length === K.KEYS.length && K.KEYS.every((b) => rows.includes(b.label)), { rows: rows.length, keys: K.KEYS.length });
+      ok('helpMouseRows', hd && hd.querySelectorAll('tr:not([data-key-id])').length === K.MOUSE.reduce((n, g) => n + g[1].length, 0));
+      ok('helpAbout', hd && hd.querySelector('.about').textContent.includes(K.APP.version) && hd.querySelector('.about').textContent.includes('MIT') && hd.querySelector('.about').textContent.includes(K.APP.repo));
+      K.setLang('ja'); await frames(1);
+      ok('helpRetranslates', hd.querySelector('h2').textContent === K.t('help.title') && document.querySelector('dialog.help') === hd);
+      K.setLang('zh-CN'); await frames(1);
+      hd.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await frames(1);
+      ok('helpEscCloses', !document.querySelector('dialog.help') && !K.modalOpen());
+      key(document.body, 'F1'); await frames(1); const h2 = document.querySelector('dialog.help'); ok('helpF1', !!h2); if (h2) h2.querySelector('[data-x]').click(); await frames(1);
+      const hint = document.getElementById('keys').textContent;
+      ok('hintFromTable', K.KEYS.filter((b) => b.hint).every((b) => hint.includes(K.t(b.hint))), hint); }
+
+    // ---- K. 播放速度 / 循环 / 从行首播放 ----
+    { K.pause(); const sp = document.getElementById('speed');
+      K.setSpeed(0.5); ok('speedSet', K.ui.speed === 0.5 && sp.value === '0.5' && K.pref('speed') === 0.5);
+      K.seek(10); K.play(); let ts = performance.now(); K.tick(ts); const a = K.now(); K.tick(ts + 1000); const b = K.now(); K.pause();
+      out.speedClock = +(b - a).toFixed(3); ok('speedSilentClock', near(out.speedClock, 0.5, 0.01), out.speedClock);
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '>', shiftKey: true, bubbles: true, cancelable: true }));
+      ok('speedKey', K.ui.speed === 0.75, K.ui.speed);
+      K.setSpeed(9); ok('speedClamped', K.ui.speed === 1);
+      K.select(null); key(document.body, 'l'); ok('loopNeedsSelection', K.ui.loop === false);
+      const l = K.screen().ord[3]; K.select(l.id);
+      key(document.body, 'l'); const lr = K.loopRange();
+      ok('loopOn', K.ui.loop && K.playing() && lr && near(lr[0], K.ls(l) + K.S().offset - 1, 1e-3) && near(lr[1], l.end + K.S().offset + 0.4, 1e-3), lr);
+      ok('loopButtonState', document.getElementById('bLoop').getAttribute('aria-pressed') === 'true');
+      const st = Object.assign({}, K.stats); K.seek(lr[1] + 0.01); K.tick(performance.now());
+      ok('loopWraps', near(K.now(), lr[0], 0.05), K.now());
+      ok('loopDrawn', K.stats.tl > st.tl);
+      const l2 = K.screen().ord[6]; K.select(l2.id); ok('loopFollowsSelection', near(K.loopRange()[0], K.ls(l2) + K.S().offset - 1, 1e-3) && K.now() >= K.loopRange()[0] - 1e-6);
+      key(document.body, 'L'); ok('loopOff', !K.ui.loop && K.loopRange() === null); K.pause();
+      K.select(l.id); key(document.body, 'Enter'); ok('enterPlaysLine', K.playing() && near(K.now(), K.ls(l) + K.S().offset - 1, 0.05), K.now()); K.pause(); }
+
+    // ---- L. 应用内对话框替代 confirm() ----
+    { let native = 0; const oc = window.confirm; window.confirm = () => { native++; return true; };
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project), false, { src: 'sample' }); K.ops.shift(K.project.lines[0], 0.1);
+      const n0 = K.project.lines.length;
+      document.getElementById('bNew').click(); await frames(1);
+      let d = document.querySelector('dialog.small');
+      ok('modalShown', !!(d && d.open && d.getAttribute('aria-labelledby') && d.querySelector('.pri.danger')) && native === 0);
+      ok('modalFocus', d && d.contains(document.activeElement));
+      const bs = d ? [...d.querySelectorAll('button')] : []; bs[bs.length - 1].focus();
+      d.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+      ok('modalTabTrap', bs[0] === document.activeElement, document.activeElement && document.activeElement.textContent);
+      d.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await frames(1);
+      ok('modalEscCancels', !document.querySelector('dialog.small') && K.project.lines.length === n0 && K.dirty);
+      document.getElementById('bNew').click(); await frames(1); d = document.querySelector('dialog.small');
+      d.querySelector('.dbody').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(30);
+      ok('modalEnterDefault', !document.querySelector('dialog.small') && K.project.lines.length === 0 && !K.dirty && K.doc.src === 'new');
+      ok('noNativeConfirm', native === 0); window.confirm = oc;
+      // 空状态：预览区和列表都有操作按钮
+      await frames(2); const em = document.getElementById('empty');
+      ok('emptyStateStage', !em.hidden && em.querySelectorAll('[data-act]').length === K.welcomeActions.filter((a) => a.where.includes('empty')).length);
+      ok('emptyStateList', document.querySelectorAll('#list [data-act]').length >= 2);
+      K.ops.add(1); await frames(1); ok('emptyStateHidesWithLines', em.hidden); }
+
+    // ---- M. 媒体横幅 / 无声时钟 ----
+    { const p = K.normalizeProject({ title: 'T', mediaName: 'song<b>.mp3', lines: [{ start: 1, end: 2, text: 'ab' }] });
+      K.setProject(p, false, { src: 'file', name: 't.kara.json' }); await frames(2);
+      const bn = document.getElementById('mbanner');
+      ok('bannerMissingMedia', !bn.hidden && bn.textContent.includes('song<b>.mp3') && !bn.querySelector('b'), bn.textContent);
+      document.getElementById('mbClose').click(); ok('bannerDismiss', bn.hidden);
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project), false, { src: 'sample' }); await frames(1);
+      ok('bannerSample', !bn.hidden && bn.textContent.includes(K.t('mb.sample')));
+      K.setProject(K.normalizeProject({ lines: [{ start: 1, end: 2, text: 'x' }] }), false, { src: 'import' }); await frames(1);
+      ok('noBannerWithoutMediaName', bn.hidden);
+      const ck = document.getElementById('clock'); K.play(); await frames(2);
+      ok('silentClockShown', !ck.hidden && ck.classList.contains('on')); K.pause(); await frames(1); ok('silentClockIdle', !ck.hidden && !ck.classList.contains('on')); }
+
+    // ---- N. 保存状态 / 关闭前提醒 / 撤销按钮 ----
+    { const ss = document.getElementById('saveState'), bu = document.getElementById('bUndo');
+      const unload = () => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project), false, { src: 'sample' }); await frames(1);
+      ok('stateSample', ss.textContent === K.t('ss.sample') && !unload() && bu.disabled, ss.textContent);
+      K.ops.shift(K.project.lines[0], 0.1); await frames(1);
+      ok('stateAutoOnly', ss.textContent === K.t('ss.autoOnly') && ss.classList.contains('warn') && unload(), ss.textContent);
+      ok('undoEnabledWithLabel', !bu.disabled && bu.title.includes(K.t('u.shift')), bu.title);
+      K.markSaved('x.kara.json', 'download'); await frames(1);
+      ok('stateSynced', ss.textContent === K.t('ss.synced', { name: 'x.kara.json' }) && !unload(), ss.textContent);
+      const meta = K.loadAutosaveMeta(); ok('metaPersisted', meta.dirty === false && meta.name === 'x.kara.json' && meta.src === 'download', meta);
+      K.undo(); await frames(1); ok('redoLabel', !document.getElementById('bRedo').disabled && document.getElementById('bRedo').title.includes(K.t('u.shift'))); }
+
+    // ---- O. 焦点：鼠标选过的下拉框不吞快捷键；聚焦的滑块自己用方向键 ----
+    { K.showTab('style'); await wait(60); const rg = document.querySelector('#tab-style input[type=range]'), t0 = K.now();
+      rg.focus(); rg.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+      ok('rangeArrowNoSeek', K.now() === t0 && document.activeElement === rg); rg.blur();
+      const sel = document.querySelector('#tab-style select[data-s="weight"]'); sel.focus();
+      sel.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
+      ok('selectBlurAfterMouse', document.activeElement !== sel); K.undo();
+      ok('selectTitle', !!sel.title);
+      document.querySelector('#tool button[data-v="scrub"]').click(); ok('prefTool', K.pref('tool') === 'scrub' && K.ui.tool === 'scrub');
+      document.querySelector('#tool button[data-v="retime"]').click();
+      document.querySelector('#tabs button[data-t="layout"]').click(); ok('prefTab', K.pref('tab') === 'layout'); K.showTab('line'); }
+
+    // ---- P. 时间线：拖动提示、Shift 不吸附、缩放到全曲 / 选中行、行名栏 ----
+    { K.setProject(K.normalizeProject(K.SAMPLES[0].project), false, { src: 'sample' }); const l = K.screen().ord[2]; K.select(l.id);
+      K.tl.pps = 80; K.tl.scroll = 24; await wait(60);
+      const r = tlc.getBoundingClientRect(), TX = (t) => r.left + K.tl.gut + (t - K.tl.scroll) * 80, I = K.screen().info.get(l.id), y = r.top + 22 + I.row * 46 + 36;
+      const u3 = l.units[3].s; K.seek(u3 + 0.03 + K.S().offset); await wait(30);
+      ev(tlc, 'pointerdown', TX(u3), y); ev(tlc, 'pointermove', TX(u3) + 3, y);
+      const tip = document.getElementById('tip'); out.tip = tip.textContent;
+      ok('dragTooltip', !tip.hidden && tip.textContent.includes(K.fmt3(K.line(l.id).units[3].s)) && tip.textContent.includes(l.units[3].t), out.tip);
+      ok('snapsWithoutShift', near(K.line(l.id).units[3].s, u3 + 0.03, 2e-3), K.line(l.id).units[3].s);
+      ev(tlc, 'pointermove', TX(u3) + 3, y, { shiftKey: true });
+      ok('shiftDisablesSnap', near(K.line(l.id).units[3].s, u3 + 3 / 80, 2e-3), K.line(l.id).units[3].s);
+      ev(tlc, 'pointerup', TX(u3) + 3, y); ok('tooltipHidesOnUp', tip.hidden); K.undo();
+      K.tlFit(); const vw = tlc.clientWidth - K.tl.gut;
+      ok('zoomFit', K.tl.pps * K.dur() <= vw + 1 && K.tl.pps * K.dur() > vw * 0.8, [K.tl.pps, K.dur(), vw]);
+      K.tlFitSel(); ok('zoomSel', K.tl.pps > 80 && K.tl.scroll <= K.ls(l) && K.tl.scroll + vw / K.tl.pps >= K.line(l.id).end, K.tl.pps);
+      // 左侧行名栏：点它不会选中块
+      ev(tlc, 'pointerdown', r.left + 10, y); ev(tlc, 'pointerup', r.left + 10, y); ok('gutterNoSelect', K.ui.sel === l.id);
+      // 中键 / 空白处拖动 = 平移
+      const s0 = K.tl.scroll; ev(tlc, 'pointerdown', r.left + 300, y, { button: 1 }); ev(tlc, 'pointermove', r.left + 200, y, { button: 1 }); ev(tlc, 'pointerup', r.left + 200, y, { button: 1 });
+      ok('middlePan', near(K.tl.scroll - s0, 100 / K.tl.pps, 1e-6), [s0, K.tl.scroll]);
+      // 预览：只点光标不改时间；双击跳到行首
+      const T0 = K.ls(l) + 0.3; K.seek(T0 + K.S().offset); await wait(40);
+      const G = K.geo(K.line(l.id), K.screen().info.get(l.id), cv.width, cv.height), ex = G.x0 + K.progressEdge(K.line(l.id), G.L, T0) * G.s, rc = cv.getBoundingClientRect();
+      const cx = rc.left + ex * rc.width / cv.width, cy = rc.top + (G.y - K.S().size * 0.4) * rc.height / cv.height, before = JSON.stringify(K.line(l.id).units);
+      ev(cv, 'pointerdown', cx, cy); ev(cv, 'pointerup', cx, cy);
+      ok('cursorClickNoRetime', JSON.stringify(K.line(l.id).units) === before);
+      cv.dispatchEvent(new MouseEvent('dblclick', { clientX: cx, clientY: cy, bubbles: true }));
+      ok('stageDblClickSeeks', near(K.now(), K.ls(l) + K.S().offset - 0.5, 0.01), K.now()); }
+
+    // ---- Q. 提示条可堆叠、错误样式不同、可关闭 ----
+    { const box = document.getElementById('toasts'); box.innerHTML = '';
+      K.toast('a'); K.toast('b', 'error'); K.toast('c', 'ok');
+      ok('toastsStack', box.children.length === 3 && box.querySelector('.toast.error[role="alert"]') && box.querySelector('.toast.info[role="status"]'));
+      box.querySelector('.toast.error .x').click(); ok('toastDismiss', box.children.length === 2 && !box.querySelector('.error'));
+      K.toast('a'); ok('toastDedupe', box.children.length === 2); box.innerHTML = ''; }
+
+    // ---- R. 无障碍：只有图标的按钮都有名字；对话框有角色 ----
+    { const unnamed = [...document.querySelectorAll('button')].filter((b) => !b.closest('[hidden]') && !(b.getAttribute('aria-label') || b.textContent.trim().replace(/[^\p{L}\p{N}]/gu, '')).length).map((b) => b.id || b.outerHTML.slice(0, 60));
+      ok('iconButtonsNamed', !unnamed.length, unnamed);
+      ok('ariaKeysExist', [...document.querySelectorAll('[data-i18n-aria]')].every((el) => K.has(el.dataset.i18nAria) && el.getAttribute('aria-label') === K.t(el.dataset.i18nAria))); }
+
     // ---- H. 拖入多个文件：全部处理（工程在前，媒体在后） ----
     { const mk = (title) => new File([JSON.stringify({ title, lines: [{ start: 1, end: 2, text: title }] })], title + '.kara.json', { type: 'application/json' });
       const dt = new DataTransfer(); dt.items.add(mk('DropA')); dt.items.add(mk('DropB'));
@@ -215,7 +393,7 @@ window.addEventListener('load', async () => {
       w(0, 'RIFF'); v.setUint32(4, 36 + ns * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, ns * 2, true);
       const wav = new File([buf], 'tone.wav', { type: 'audio/wav' });
       const dt2 = new DataTransfer(); dt2.items.add(wav); dt2.items.add(mk('DropC'));
-      const seen = []; K.on('load', () => seen.push(K.project.title));
+      const seen = [], unsub = K.on('load', () => seen.push(K.project.title)); K.dirty = false;
       window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); await until(() => seen.includes('DropB'));
       ok('dropMultiple', seen.includes('DropA') && seen.includes('DropB') && K.project.title === 'DropB', seen);
       window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt2, bubbles: true, cancelable: true }));
@@ -223,7 +401,22 @@ window.addEventListener('load', async () => {
       out.media = { title: K.project.title, mediaName: K.project.mediaName, eEnd: document.getElementById('eEnd').value, dur: K.dur(), peaks: !!K.peaks };
       ok('dropMediaAfterProject', K.project.title === 'DropC' && K.project.mediaName === 'tone.wav', out.media);
       ok('eEndFollowsMedia', near(parseFloat(out.media.eEnd), 1.5, 0.02), out.media);
-      ok('mediaLabelShowsName', document.getElementById('mediaName').textContent === 'tone.wav'); }
+      ok('mediaLabelShowsName', document.getElementById('mediaName').textContent === 'tone.wav');
+      await frames(2); ok('bannerHiddenWithMedia', document.getElementById('mbanner').hidden && document.getElementById('clock').hidden);
+      const md = document.getElementById('media'); K.setSpeed(0.75);
+      ok('mediaRatePitch', md.playbackRate === 0.75 && md.preservesPitch === true, [md.playbackRate, md.preservesPitch]); K.setSpeed(1);
+      ok('volumeEnabledWithMedia', !document.getElementById('vol').disabled && !document.getElementById('bMute').disabled);
+      document.getElementById('bMute').click(); ok('muteToggles', md.muted === true && K.pref('muted') === true); document.getElementById('bMute').click(); ok('unmute', md.muted === false);
+      // 两次拖放紧挨着：排队处理，不交错
+      unsub(); seen.length = 0; K.dirty = false;
+      const dA = new DataTransfer(); dA.items.add(mk('Q1')); dA.items.add(mk('Q2'));
+      const dB = new DataTransfer(); dB.items.add(mk('Q3')); dB.items.add(mk('Q4'));
+      const un2 = K.on('load', (why) => { if (why === 'project') seen.push(K.project.title); });
+      window.dispatchEvent(new DragEvent('drop', { dataTransfer: dA, bubbles: true, cancelable: true }));
+      window.dispatchEvent(new DragEvent('drop', { dataTransfer: dB, bubbles: true, cancelable: true }));
+      await until(() => seen.length >= 4); un2();
+      ok('dropsSerialised', seen.join() === 'Q1,Q2,Q3,Q4', seen); }
+
   } catch (e) { out.error = String(e && e.stack || e); }
   const pre = document.createElement('pre'); pre.id = 'result';
   const head = out.error ? `FAIL: exception (${fails.length} failed of ${n} checks before it)` : fails.length ? `FAIL: ${fails.length} of ${n} checks failed` : `PASS: ${n} checks`;

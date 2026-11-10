@@ -1,75 +1,115 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>卡拉OK歌词工作室</title>
+<title>Karaoke Lyrics Studio</title>
+<meta name="description" content="Free in-browser karaoke lyric editor: per-character wipe, furigana above kanji, multi-row layouts with count-in dots, a timeline for retiming, and transparent PNG-sequence export. Runs locally; nothing is uploaded.">
+<meta name="theme-color" content="#111317">
+<meta name="color-scheme" content="dark">
+<!-- Open Graph / Twitter. Crawlers want absolute image URLs: after deploying, replace the relative image paths below with your full GitHub Pages URL -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Karaoke Lyrics Studio">
+<meta property="og:description" content="Time karaoke lyrics character by character in your browser, with furigana, multi-row layouts and transparent PNG-sequence export.">
+<meta property="og:image" content="assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Karaoke Lyrics Studio logo and title above a lyric bar that is half wiped, with a wipe cursor">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Karaoke Lyrics Studio">
+<meta name="twitter:description" content="Time karaoke lyrics character by character in your browser, with furigana, multi-row layouts and transparent PNG-sequence export.">
+<meta name="twitter:image" content="assets/social-preview.png">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<noscript><div class="noscript"><b>Karaoke Lyrics Studio</b> runs entirely in your browser and needs JavaScript. Please enable JavaScript, or open this page in Chrome or Edge.</div></noscript>
+<div id="phoneNote" class="note" role="status" hidden><span data-i18n="phone.note"></span><button id="pnClose" data-i18n="phone.ok"></button></div>
 <div id="app">
   <header id="top">
-    <b class="brand" data-i18n="app.name">卡拉OK歌词工作室</b>
-    <input id="title" type="text" data-i18n-title="top.title" data-i18n-placeholder="top.title" spellcheck="false">
+    <button id="bLeft" class="ico tog" data-i18n-aria="top.togLeft" data-i18n-title="top.togLeft" aria-pressed="true">☰</button>
+    <b class="brand" data-i18n="app.name">Karaoke Lyrics Studio</b>
+    <input id="title" type="text" data-i18n-title="top.title" data-i18n-placeholder="top.title" data-i18n-aria="top.title" spellcheck="false">
+    <button id="saveState" class="chip"><i aria-hidden="true"></i><span></span></button>
     <span class="grp">
-      <button id="bNew" data-i18n="top.new" data-i18n-title="top.newTip">新建</button>
-      <button id="bOpen" data-i18n="top.open" data-i18n-title="top.openTip">打开…</button>
-      <button id="bSave" class="pri" data-i18n="top.save" data-i18n-title="top.saveTip">保存</button>
-      <button id="bSaveAs" data-i18n="top.saveAs" data-i18n-title="top.saveAsTip">另存为…</button>
+      <button id="bNew" data-i18n="top.new" data-i18n-title="top.newTip">New</button>
+      <button id="bOpen" data-i18n="top.open" data-i18n-title="top.openTip">Open…</button>
+      <button id="bSave" class="pri" data-i18n="top.save" data-i18n-title="top.saveTip">Save</button>
+      <button id="bSaveAs" data-i18n="top.saveAs" data-i18n-title="top.saveAsTip">Save As…</button>
     </span>
     <span class="grp">
-      <button id="bImport" data-i18n="top.import" data-i18n-title="top.importTip">导入 SRT / JSON…</button>
-      <select id="samples" data-i18n-title="top.samplesTip"><option value="" data-i18n="top.samples">示例…</option></select>
-      <button id="bMedia" data-i18n="top.media" data-i18n-title="top.mediaTip">载入音视频…</button>
-      <span id="mediaName" class="hint" data-i18n="top.noMedia">未载入音视频</span>
+      <button id="bImport" data-i18n="top.import" data-i18n-title="top.importTip">Import…</button>
+      <select id="samples" data-i18n-title="top.samplesTip" data-i18n-aria="top.samplesTip"><option value="" data-i18n="top.samples">Samples…</option></select>
+      <button id="bMedia" data-i18n="top.media" data-i18n-title="top.mediaTip">Load Media…</button>
+      <span id="mediaName" class="hint"></span>
     </span>
     <span class="grp right">
-      <button id="bUndo" data-i18n="top.undo" data-i18n-title="top.undoTip">↶ 撤销</button><button id="bRedo" data-i18n="top.redo" data-i18n-title="top.redoTip">↷ 重做</button>
-      <button id="bRec" data-i18n="top.rec" data-i18n-title="top.recTip">录屏模式</button>
-      <select id="lang" data-i18n-title="top.langTip"></select>
+      <button id="bUndo" class="ico" data-i18n-aria="top.undo">↶</button><button id="bRedo" class="ico" data-i18n-aria="top.redo">↷</button>
+      <button id="bRec" data-i18n="top.rec" data-i18n-title="top.recTip">Record Mode</button>
+      <button id="bHelp" class="ico" data-i18n-aria="top.help" data-i18n-title="top.helpTip">?</button>
+      <select id="lang" data-i18n-title="top.langTip" data-i18n-aria="top.langTip"></select>
+      <button id="bRight" class="ico tog" data-i18n-aria="top.togRight" data-i18n-title="top.togRight" aria-pressed="true">⚙</button>
     </span>
   </header>
 
-  <aside id="left">
-    <h3><span data-i18n="left.title">歌词行</span><button id="bAdd" data-i18n="left.add" data-i18n-title="left.addTip">＋ 添加</button></h3>
+  <aside id="left" data-i18n-aria="left.title">
+    <h3><span data-i18n="left.title">Lyrics</span><button id="bAdd" data-i18n="left.add" data-i18n-title="left.addTip">+ Add</button></h3>
     <div id="list"></div>
   </aside>
 
   <main id="center">
-    <div id="stageBox"><canvas id="cv" width="1920" height="1080"></canvas></div>
+    <div id="stageBox">
+      <canvas id="cv" width="1920" height="1080" data-i18n-aria="stage.label" role="img"></canvas>
+      <div id="mbanner" class="banner" role="status" hidden>
+        <span class="ic" aria-hidden="true">♪</span><span class="msg"><span class="tx"></span> <span class="sub hint"></span></span>
+        <button id="mbLoad" class="pri" data-i18n="mb.load">Load media…</button>
+        <button id="mbClose" class="x" data-i18n-aria="dlg.close" data-i18n-title="dlg.close">×</button>
+      </div>
+      <div id="empty" hidden></div>
+    </div>
     <div id="bar">
       <button id="bPlay" class="pri" data-i18n-title="bar.playTip">▶</button>
       <span id="tm">0:00.00 / 0:00.00</span>
-      <span class="seg" id="tool" data-i18n-title="bar.toolTip">
-        <button data-v="retime" class="on" data-i18n="bar.retime" data-i18n-title="bar.retimeTip">拖光标：校时</button><button data-v="scrub" data-i18n="bar.scrub" data-i18n-title="bar.scrubTip">拖光标：浏览</button>
+      <span id="clock" class="chip" data-i18n-title="bar.clockTip" hidden><span data-i18n="bar.clock">Silent clock</span></span>
+      <select id="speed" data-i18n-title="bar.speedTip" data-i18n-aria="bar.speed"></select>
+      <button id="bLoop" data-i18n-title="bar.loopTip" aria-pressed="false"><span aria-hidden="true">⟲ </span><span data-i18n="bar.loop">Loop</span></button>
+      <span class="vol"><button id="bMute" class="ico" aria-pressed="false">🔊</button><input id="vol" type="range" min="0" max="1" step="0.05" data-i18n-aria="bar.volume" data-i18n-title="bar.volume"></span>
+      <span class="seg" id="tool" role="group" data-i18n-aria="bar.toolTip" data-i18n-title="bar.toolTip">
+        <button data-v="retime" class="on" data-i18n="bar.retime" data-i18n-title="bar.retimeTip">Drag: Retime</button><button data-v="scrub" data-i18n="bar.scrub" data-i18n-title="bar.scrubTip">Drag: Scrub</button>
       </span>
-      <span class="hint" id="keys" data-i18n="bar.hint" data-i18n-title="bar.hint"></span>
-      <span class="right"><button id="bZout" data-i18n-title="bar.zoomOut">－</button><button id="bZin" data-i18n-title="bar.zoomIn">＋</button></span>
+      <button class="hint" id="keys"></button>
     </div>
   </main>
 
-  <aside id="right">
-    <div id="tabs"><button data-t="line" class="on" data-i18n="tab.line">行</button><button data-t="style" data-i18n="tab.style">样式</button><button data-t="layout" data-i18n="tab.layout">版面</button><button data-t="export" data-i18n="tab.export">导出</button></div>
-    <div id="tab-line" class="tab"></div>
-    <div id="tab-style" class="tab" hidden></div>
-    <div id="tab-layout" class="tab" hidden></div>
-    <div id="tab-export" class="tab" hidden>
-      <h4 data-i18n="exp.png">PNG 序列（带透明通道）</h4>
-      <div class="row"><label data-i18n="exp.fps">帧率</label><select id="s_fps"><option>24</option><option>25</option><option>30</option><option>50</option><option>60</option></select></div>
-      <div class="row"><label data-i18n="exp.range">起止(s)</label><input id="eStart" type="number" step="0.1" value="0" data-i18n-title="exp.start"><input id="eEnd" type="number" step="0.1" data-i18n-title="exp.end"></div>
-      <div class="row"><label data-i18n="exp.bg">背景</label><select id="eBg"><option value="transparent" data-i18n="exp.bgNone">透明</option><option value="color" data-i18n="exp.bgColor">纯色背景</option></select></div>
-      <div class="btns"><button id="bPng" class="pri" data-i18n="exp.go">导出 PNG 序列到文件夹…</button><button id="bFrame" data-i18n="exp.frame">保存当前帧</button><button id="bCancel" data-i18n="exp.cancel" hidden>取消</button></div>
-      <div id="prog"><i></i></div><div class="hint" id="expMsg"></div>
+  <aside id="right" data-i18n-aria="right.label">
+    <div id="tabs" role="tablist"><button role="tab" id="tb-line" aria-controls="tab-line" data-t="line" class="on" data-i18n="tab.line">Line</button><button role="tab" id="tb-style" aria-controls="tab-style" data-t="style" data-i18n="tab.style">Style</button><button role="tab" id="tb-layout" aria-controls="tab-layout" data-t="layout" data-i18n="tab.layout">Layout</button><button role="tab" id="tb-export" aria-controls="tab-export" data-t="export" data-i18n="tab.export">Export</button></div>
+    <div id="tab-line" class="tab" role="tabpanel" aria-labelledby="tb-line"></div>
+    <div id="tab-style" class="tab" role="tabpanel" aria-labelledby="tb-style" hidden></div>
+    <div id="tab-layout" class="tab" role="tabpanel" aria-labelledby="tb-layout" hidden></div>
+    <div id="tab-export" class="tab" role="tabpanel" aria-labelledby="tb-export" hidden>
+      <h4 data-i18n="exp.png">PNG sequence</h4>
+      <div class="row"><label for="s_fps" data-i18n="exp.fps">Frame rate</label><select id="s_fps"><option>24</option><option>25</option><option>30</option><option>50</option><option>60</option></select></div>
+      <div class="row"><label data-i18n="exp.range">Range (s)</label><input id="eStart" type="number" step="0.1" value="0" data-i18n-title="exp.start" data-i18n-aria="exp.start"><input id="eEnd" type="number" step="0.1" data-i18n-title="exp.end" data-i18n-aria="exp.end"></div>
+      <div class="row"><label for="eBg" data-i18n="exp.bg">Background</label><select id="eBg"><option value="transparent" data-i18n="exp.bgNone">Transparent</option><option value="color" data-i18n="exp.bgColor">Solid color</option></select></div>
+      <div class="btns"><button id="bPng" class="pri" data-i18n="exp.go">Export PNG sequence to folder…</button><button id="bFrame" data-i18n="exp.frame">Save current frame</button><button id="bCancel" data-i18n="exp.cancel" hidden>Cancel</button></div>
+      <div id="prog"><i></i></div><div class="hint" id="expMsg" aria-live="polite"></div>
       <div class="hint"><span data-i18n="exp.premiere"></span><br><span data-i18n="exp.prores"></span><br><code>ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le lyrics.mov</code></div>
-      <h4 data-i18n="exp.rec">录屏</h4>
+      <h4 data-i18n="exp.rec">Screen recording</h4>
       <div class="hint" data-i18n="exp.recHint"></div>
     </div>
   </aside>
 
-  <section id="tl"><canvas id="tlc"></canvas></section>
+  <section id="tl" data-i18n-aria="tl.label">
+    <div id="tlDiv" role="separator" tabindex="0" aria-orientation="horizontal" aria-valuemin="110" data-i18n-aria="tl.resize" data-i18n-title="tl.resizeTip"></div>
+    <div class="tlTools"><button id="bFit" data-i18n="bar.fit" data-i18n-title="bar.fitTip">Fit</button><button id="bFitSel" data-i18n="bar.fitSel" data-i18n-title="bar.fitSelTip">Line</button><button id="bZout" class="ico" data-i18n-title="bar.zoomOut" data-i18n-aria="bar.zoomOut">－</button><button id="bZin" class="ico" data-i18n-title="bar.zoomIn" data-i18n-aria="bar.zoomIn">＋</button></div>
+    <div id="tlScroll"><canvas id="tlc"></canvas></div>
+    <canvas id="tlov" data-i18n-title="tl.overviewTip"></canvas>
+  </section>
 </div>
-<div id="menu" hidden></div>
-<div id="toast" hidden></div>
+<div id="menu" role="menu" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip" hidden></div>
+<div id="dropzone" hidden><div><b data-i18n="drop.title">Drop to open</b><span data-i18n="drop.text"></span></div></div>
 <input id="fOpen" type="file" hidden>
 <video id="media" playsinline hidden></video>
 
@@ -77,9 +117,13 @@
 <script src="js/i18n.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ops.js"></script>
+<script src="js/dialogs.js"></script>
+<script src="js/keys.js"></script>
+<script src="js/help.js"></script>
 <script src="js/stage.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/panels.js"></script>
+<script src="js/layout.js"></script>
 <script>window.K.SAMPLES = [];</script>
 <script src="samples/hydro_king_jp.js"></script>
 <script src="samples/hydro_king_fr.js"></script>

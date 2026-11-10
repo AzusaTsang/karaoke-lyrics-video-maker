@@ -1,28 +1,61 @@
-/* 主程序：播放时钟、媒体、工程文件、导入导出、快捷键 */
+/* 主程序：播放时钟（速度 / 循环 / 音量）、媒体、工程文件、保存状态、导入导出、启动 */
 (function () {
   const K = window.K, $ = (id) => document.getElementById(id), T = K.t;
+  /* 发布信息：仓库地址只在这里写一次（帮助 → 关于里会显示）。发布前把 <your-github-username> 换成自己的用户名 */
+  K.APP = { version: '1.0.0', repo: 'https://github.com/<your-github-username>/karaoke-studio' };
   const media = $('media'); let hasMedia = false;
   const clk = { playing: false, t: 0, last: 0 };
+  K.hasMedia = () => hasMedia;
   K.dur = () => (hasMedia && isFinite(media.duration) ? media.duration : K.project.duration);
   K.now = () => (hasMedia ? media.currentTime : clk.t);
   K.seek = (t) => { t = Math.max(0, Math.min(K.dur(), t)); if (hasMedia) media.currentTime = t; else clk.t = t; if (K.tlReveal && !K.tl.scrubbing) K.tlReveal(t); };
   K.playing = () => (hasMedia ? !media.paused : clk.playing);
-  K.play = () => { if (hasMedia) media.play(); else { clk.playing = true; clk.last = performance.now(); } };
+  K.play = () => { if (hasMedia) media.play().catch(() => {}); else { if (clk.t >= K.dur()) clk.t = 0; clk.playing = true; clk.last = performance.now(); } };
   K.pause = () => { if (hasMedia) media.pause(); clk.playing = false; };
-  let toastT; K.toast = (s) => { const el = $('toast'); el.textContent = s; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), 4500); };
+
+  /* ---------- 播放速度：媒体保持音高；没有媒体时内部时钟同样按这个速度走 ---------- */
+  K.SPEEDS = [0.5, 0.75, 1, 1.25];
+  K.ui.speed = K.SPEEDS.includes(K.pref('speed')) ? K.pref('speed') : 1;
+  const applyRate = () => { media.preservesPitch = media.mozPreservesPitch = media.webkitPreservesPitch = true; media.defaultPlaybackRate = media.playbackRate = K.ui.speed; };
+  K.setSpeed = (v) => { v = +v; if (!K.SPEEDS.includes(v)) v = 1; K.ui.speed = v; applyRate(); K.pref('speed', v); $('speed').value = String(v); };
+  K.stepSpeed = (d) => { const i = K.SPEEDS.indexOf(K.ui.speed); K.setSpeed(K.SPEEDS[Math.max(0, Math.min(K.SPEEDS.length - 1, i + d))]); K.toast(T('msg.speed', { v: K.ui.speed })); };
+
+  /* ---------- 循环选中行：从行首前 PRE 秒到行尾后 POST 秒反复播放；循环范围跟着选中行走 ---------- */
+  const PRE = 1, POST = 0.4;
+  K.ui.loop = false;
+  K.loopRange = () => { const l = K.ui.loop && K.sel(); if (!l) return null; const o = K.S().offset; return [Math.max(0, K.r3(K.ls(l) + o - PRE)), Math.min(K.dur(), K.r3(l.end + o + POST))]; };
+  const loopUi = () => { const b = $('bLoop'); b.classList.toggle('on', K.ui.loop); b.setAttribute('aria-pressed', K.ui.loop); };
+  K.toggleLoop = (on) => {
+    on = on == null ? !K.ui.loop : !!on;
+    if (on && !K.sel()) { K.toast(T('msg.loopNeedSel')); on = false; }
+    K.ui.loop = on; loopUi();
+    if (on) { const r = K.loopRange(); if (K.now() < r[0] || K.now() > r[1]) K.seek(r[0]); if (!K.playing()) K.play(); }
+  };
+  K.playLine = () => { const l = K.sel(); if (!l) return; K.seek(Math.max(0, K.ls(l) + K.S().offset - PRE)); K.play(); };
+
+  /* ---------- 音量 / 静音（只对载入的媒体） ---------- */
+  K.setVolume = (v, muted) => {
+    media.volume = Math.max(0, Math.min(1, +v || 0)); media.muted = !!muted;
+    K.pref('vol', media.volume); K.pref('muted', media.muted);
+    const b = $('bMute'), off = media.muted || media.volume === 0; b.textContent = off ? '🔇' : '🔊';
+    b.setAttribute('aria-pressed', media.muted); b.setAttribute('aria-label', T(media.muted ? 'bar.unmute' : 'bar.mute')); b.title = T(media.muted ? 'bar.unmute' : 'bar.mute');
+    $('vol').value = media.volume;
+  };
 
   /* ---------- 导出结束时间：用户没手动改过就跟随时长 ---------- */
   let eEndManual = false;
   const syncEnd = () => { if (!eEndManual) $('eEnd').value = K.dur().toFixed(2); };
 
   /* ---------- 媒体 ---------- */
-  let mediaUrl = null, mediaTok = 0;
+  let mediaUrl = null, mediaTok = 0, bannerOff = false;
   async function loadMedia(f) {
     const tok = ++mediaTok;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
-    mediaUrl = URL.createObjectURL(f); media.src = mediaUrl; hasMedia = true; K.peaks = null; K.invalidate();
-    K.project.mediaName = f.name; const mn = $('mediaName'); mn.removeAttribute('data-i18n'); mn.textContent = mn.title = f.name;
-    media.onloadedmetadata = () => { K.project.duration = Math.ceil(media.duration * 100) / 100; syncEnd(); K.autosave(); K.invalidate(); };
+    const wasPlaying = K.playing(), t = K.now(); K.pause();
+    mediaUrl = URL.createObjectURL(f); media.src = mediaUrl; hasMedia = true; K.peaks = null; applyRate(); K.invalidate();
+    K.project.mediaName = f.name; mediaUi();
+    media.onloadedmetadata = () => { if (tok !== mediaTok) return; K.project.duration = Math.ceil(media.duration * 100) / 100; applyRate(); if (t > 0 && t < media.duration) media.currentTime = t; syncEnd(); K.autosave(); K.invalidate(); if (wasPlaying) K.play(); };
+    media.onerror = () => { if (tok !== mediaTok) return; hasMedia = false; mediaUi(); K.toast(T('msg.mediaFail', { name: f.name }), 'error'); };
     if (f.size > 400 * 1024 * 1024) { K.toast(T('msg.bigMedia')); return; }
     let ac = null;
     try {
@@ -33,8 +66,25 @@
     } catch (e) { if (tok === mediaTok) K.toast(T('msg.noWave')); }
     finally { if (ac) ac.close().catch(() => {}); }
   }
+  K.loadMedia = loadMedia;
   /* 视频帧到位 / 跳转完成时时间可能没变，但画面（视频背景）要更新 */
   ['seeked', 'loadeddata', 'pause', 'play'].forEach((ev) => media.addEventListener(ev, K.invalidate));
+  K.pickMedia = () => { const i = $('fOpen'); i.accept = 'audio/*,video/*'; i.value = ''; i.onchange = () => i.files[0] && queue(() => loadMedia(i.files[0])); i.click(); };
+
+  /* 顶栏的媒体名、预览区的“缺少媒体”横幅、音量控件 */
+  function mediaUi() {
+    const mn = $('mediaName'), name = K.project.mediaName;
+    mn.textContent = hasMedia ? name : T('top.noMedia'); mn.title = hasMedia ? name : T('top.mediaTip');
+    mn.classList.toggle('has', hasMedia);
+    $('bMute').disabled = $('vol').disabled = !hasMedia;
+    const bn = $('mbanner'), show = !hasMedia && !bannerOff && (K.doc.src === 'sample' || !!name);
+    bn.hidden = !show;
+    if (show) {
+      bn.querySelector('.tx').textContent = K.doc.src === 'sample' ? T('mb.sample') : T('mb.missing', { name });
+      bn.querySelector('.sub').textContent = K.doc.src === 'sample' ? '' : T('mb.drop');
+    }
+  }
+  K.mediaUi = mediaUi;
 
   /* ---------- 工程文件 ---------- */
   let fileHandle = null;
@@ -43,16 +93,18 @@
   const projBlob = () => new Blob([JSON.stringify(K.project, null, 1)], { type: 'application/json' });
   const TYPES = () => [{ description: T('projType'), accept: { 'application/json': ['.kara.json', '.json'] } }];
   const isUntitled = (s) => !s || K.tAll('untitled').includes(s);
+  const fname = () => (K.project.title || 'lyrics').replace(/[\\/:*?"<>|]/g, '_') + '.kara.json';
   async function saveAs() {
-    if (!window.showSaveFilePicker) { download(projBlob(), (K.project.title || 'lyrics') + '.kara.json'); K.dirty = false; return; }
-    try { fileHandle = await window.showSaveFilePicker({ suggestedName: (K.project.title || 'lyrics') + '.kara.json', types: TYPES() }); } catch (e) { return; }
-    await save();
+    if (!window.showSaveFilePicker) { download(projBlob(), fname()); K.markSaved(fname(), 'download'); K.toast(T('msg.downloaded', { name: fname() }), 'ok'); return; }
+    let h; try { h = await window.showSaveFilePicker({ suggestedName: fname(), types: TYPES() }); } catch (e) { return; }
+    fileHandle = h; await save();
   }
   async function save() {
     if (!fileHandle) return saveAs();
-    try { const w = await fileHandle.createWritable(); await w.write(projBlob()); await w.close(); K.dirty = false; K.toast(T('msg.saved', { name: fileHandle.name })); }
-    catch (e) { K.toast(T('msg.saveFail', { msg: e.message })); }
+    try { const w = await fileHandle.createWritable(); await w.write(projBlob()); await w.close(); K.markSaved(fileHandle.name, 'file'); K.toast(T('msg.saved', { name: fileHandle.name }), 'ok'); }
+    catch (e) { K.toast(T('msg.saveFail', { msg: e.message }), 'error'); }
   }
+  K.save = save; K.saveAs = saveAs;
   function parseSrt(txt) {
     const ts = (s) => { const m = s.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000 : 0; };
     return txt.replace(/^﻿/, '').replace(/\r/g, '').split(/\n\s*\n/).map((b) => {
@@ -60,32 +112,64 @@
       const [a, c] = L[k].split('-->'); return { start: ts(a), end: ts(c), text: L.slice(k + 1).join(' ').trim() };
     }).filter((c) => c && c.text);
   }
-  const isMedia = (f) => /\.(mp3|wav|m4a|aac|flac|ogg|mp4|mov|mkv|webm)$/i.test(f.name) || /^(audio|video)\//.test(f.type);
+  const isMedia = (f) => /\.(mp3|wav|m4a|aac|flac|ogg|opus|mp4|mov|mkv|webm)$/i.test(f.name) || /^(audio|video)\//.test(f.type);
+  /* 换工程：旧工程有未保存修改时先确认；新工程来源记在 K.doc 里 */
+  const replaceProject = async (p, doc, what) => {
+    if (!(await K.confirmDiscard(what))) return false;
+    fileHandle = doc.handle || null;
+    K.setProject(p, false, { src: doc.src, name: doc.name || '' }); K.ensureFont(); $('title').value = p.title; return true;
+  };
   async function openFile(f, handle) {
     const name = f.name.toLowerCase();
     if (isMedia(f)) return loadMedia(f);
-    const txt = await f.text();
+    let p, srt = name.endsWith('.srt');
     try {
-      let p;
-      if (name.endsWith('.srt')) { p = K.normalizeProject({ lines: parseSrt(txt) }); p.settings = K.cleanSettings(K.S()); p.title = f.name.replace(/\.srt$/i, ''); K.toast(T('msg.srt')); }
+      const txt = await f.text();
+      if (srt) { p = K.normalizeProject({ lines: parseSrt(txt) }); p.settings = K.cleanSettings(K.S()); p.title = f.name.replace(/\.srt$/i, ''); }
       else { p = K.normalizeProject(JSON.parse(txt)); if (isUntitled(p.title)) p.title = f.name.replace(/(\.kara)?\.json$/i, ''); }
-      fileHandle = name.endsWith('.json') && handle ? handle : null;
-      K.setProject(p); K.ensureFont(); $('title').value = p.title;
-    } catch (e) { K.toast(T('msg.readFail', { msg: e.message })); }
+    } catch (e) { K.toast(T('msg.readFail', { msg: e.message }), 'error'); return; }
+    const isProj = !srt && name.endsWith('.json');
+    if (await replaceProject(p, { src: isProj ? 'file' : 'import', name: isProj ? f.name : '', handle: isProj && handle ? handle : null }, 'open') && srt) K.toast(T('msg.srt'));
   }
+  /* 打开 / 拖入的文件排队逐个处理，两次拖放不会交错 */
+  let q = Promise.resolve();
+  const queue = (fn) => (q = q.then(fn).catch((e) => K.toast(T('msg.readFail', { msg: e && e.message }), 'error')));
+  K.fileQueue = () => q;
   async function openDialog(accept) {
     if (window.showOpenFilePicker && !accept) {
-      try { const [h] = await window.showOpenFilePicker({ types: TYPES() }); openFile(await h.getFile(), h); } catch (e) {}
+      try { const [h] = await window.showOpenFilePicker({ types: TYPES() }); const f = await h.getFile(); queue(() => openFile(f, h)); } catch (e) {}
       return;
     }
-    const i = $('fOpen'); i.accept = accept || '.json'; i.value = ''; i.onchange = () => i.files[0] && openFile(i.files[0]); i.click();
+    const i = $('fOpen'); i.accept = accept || '.json'; i.value = ''; i.onchange = () => i.files[0] && queue(() => openFile(i.files[0])); i.click();
   }
+  K.openDialog = openDialog;
+  K.loadSample = (i) => { const s = K.SAMPLES[i]; return s ? replaceProject(K.normalizeProject(s.project), { src: 'sample' }, 'sample') : Promise.resolve(false); };
+  K.newProject = () => { const p = K.blank(); p.settings = K.cleanSettings(K.S()); return replaceProject(p, { src: 'new' }, 'new'); };
+  /* 欢迎页“试试示例”：已经是没改过的示例就直接用；然后从第一句前开始播放 */
+  K.trySample = async () => {
+    if (!(K.doc.src === 'sample' && !K.dirty && K.project.lines.length) && !(await K.loadSample(0))) return;
+    const f = K.screen().ord[0]; if (f) { K.select(f.id); K.seek(Math.max(0, K.ls(f) + K.S().offset - 3)); } K.play();
+  };
+
+  /* ---------- 保存状态 ---------- */
+  function saveInfo() {
+    const n = K.doc.name;
+    if (!K.dirty) {
+      if (fileHandle) return ['ok', T('ss.saved', { name: fileHandle.name }), T('ss.savedTip', { name: fileHandle.name })];
+      if (K.doc.src === 'sample') return ['', T('ss.sample'), T('ss.sampleTip')];
+      if (n) return ['ok', T('ss.synced', { name: n }), T('ss.syncedTip', { name: n })];
+      return ['', T('ss.new'), T('ss.newTip')];
+    }
+    if (!K.autosaveOk) return ['err', T('ss.failed'), T('ss.failedTip')];
+    return fileHandle ? ['warn', T('ss.unsaved'), T('ss.unsavedTip', { name: fileHandle.name })] : ['warn', T('ss.autoOnly'), T('ss.autoOnlyTip')];
+  }
+  K.saveInfo = saveInfo;
 
   /* ---------- 导出 ---------- */
   let cancel = false;
   const expBg = () => ($('eBg').value === 'color' ? 'color' : 'none');
   async function exportPng() {
-    if (!window.showDirectoryPicker) { K.toast(T('exp.needChrome')); return; }
+    if (!window.showDirectoryPicker) { K.toast(T('exp.needChrome'), 'error'); return; }
     let dir; try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) { return; }
     await K.ensureFont();
     const S = K.S(), fps = +S.fps, t0 = parseFloat($('eStart').value) || 0, t1 = parseFloat($('eEnd').value) || K.dur();
@@ -113,17 +197,23 @@
   }
 
   /* ---------- 每帧 ----------
-     画布由 drawStage / drawTimeline 自己判断要不要重画；DOM 文字只在变化时写入 */
+     画布由 drawStage / drawTimeline 自己判断要不要重画；DOM 文字 / 属性只在变化时写入 */
   const shown = {};
   const setText = (id, s) => { if (shown[id] !== s) { shown[id] = s; $(id).textContent = s; } };
+  const setOnce = (k, v, fn) => { if (shown[k] !== v) { shown[k] = v; fn(); } };
   K.tick = (ts) => {
-    if (!hasMedia && clk.playing) { clk.t += (ts - clk.last) / 1000; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; } }
+    if (!hasMedia && clk.playing) { clk.t += ((ts - clk.last) / 1000) * K.ui.speed; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; } }
+    const lr = K.loopRange(); if (lr && K.playing() && (K.now() >= lr[1] || (!hasMedia && clk.t >= K.dur()))) { K.seek(lr[0]); if (!K.playing()) K.play(); }
     const t = K.now();
     K.drawStage(hasMedia ? media : null);
     if (!document.body.classList.contains('rec')) {
       K.drawTimeline(); K.refreshPanels(); K.markNow(t - K.S().offset);
-      setText('bPlay', K.playing() ? '⏸' : '▶');
+      const pl = K.playing();
+      setOnce('play', pl + K.lang, () => { const b = $('bPlay'); b.textContent = pl ? '⏸' : '▶'; b.setAttribute('aria-label', T(pl ? 'bar.pause' : 'bar.play')); });
       setText('tm', K.fmt(t) + ' / ' + K.fmt(K.dur()));
+      setOnce('clock', [hasMedia, pl, K.lang].join(), () => { const c = $('clock'); c.hidden = hasMedia; c.classList.toggle('on', pl); });
+      const si = saveInfo();
+      setOnce('save', si.join('|'), () => { const b = $('saveState'); b.className = 'chip ' + si[0]; b.querySelector('span').textContent = si[1]; b.title = si[2]; b.setAttribute('aria-label', si[1] + '. ' + si[2]); });
       const dt = (K.dirty ? '● ' : '') + (K.project.title || T('untitled')) + ' — ' + T('app.name');
       if (document.title !== dt) document.title = dt;
     }
@@ -137,95 +227,96 @@
     while (sm.options.length > 1) sm.remove(1);
     (K.SAMPLES || []).forEach((s, i) => { const o = document.createElement('option'), k = 'sample.' + s.project.title; o.value = i; o.textContent = K.has(k) ? T(k) : s.name; sm.appendChild(o); });
   }
+  function undoUi() {
+    const u = K.undoWhy(), r = K.redoWhy(), bu = $('bUndo'), br = $('bRedo');
+    bu.disabled = !K.canUndo(); br.disabled = !K.canRedo();
+    bu.title = u != null ? T('top.undoWhat', { what: T(u ? 'u.' + u : 'u.edit') }) : T('top.undoNone');
+    br.title = r != null ? T('top.redoWhat', { what: T(r ? 'u.' + r : 'u.edit') }) : T('top.redoNone');
+  }
   function boot() {
-    const auto = K.loadAutosave();
-    K.project = auto ? K.normalizeProject(auto) : K.SAMPLES && K.SAMPLES[0] ? K.normalizeProject(K.SAMPLES[0].project) : K.blank();
+    const auto = K.loadAutosave(), first = K.firstRun(!!auto);
+    if (auto) { const m = K.loadAutosaveMeta(); K.project = K.normalizeProject(auto); K.dirty = m.dirty; K.doc = { src: m.src, name: m.name }; }
+    else if (K.SAMPLES && K.SAMPLES[0]) { K.project = K.normalizeProject(K.SAMPLES[0].project); K.doc = { src: 'sample', name: '' }; }
+    else K.project = K.blank();
     K.resetHistory();
-    K.initStage(); K.initTimeline(); K.initPanels();
+    K.initStage(); K.initTimeline(); K.initPanels(); K.initLayout();
     $('title').value = K.project.title; syncEnd();
-    $('title').onchange = (e) => { K.project.title = e.target.value; K.commit(); };
+    $('title').onchange = (e) => { K.project.title = e.target.value; K.commit('title'); };
     $('eEnd').addEventListener('input', (e) => { eEndManual = e.target.value.trim() !== ''; });
-    K.on('load', (why) => { if (why === 'project') eEndManual = false; $('title').value = K.project.title; syncEnd(); $('s_fps').value = K.S().fps; });
-    $('s_fps').value = K.S().fps; $('s_fps').onchange = (e) => { K.S().fps = +e.target.value; K.commit(); };
+    K.on('load', (why) => { if (why === 'project') { eEndManual = false; bannerOff = false; } $('title').value = K.project.title; syncEnd(); $('s_fps').value = K.S().fps; mediaUi(); K.renderEmpty(); });
+    K.on('change', () => { undoUi(); if (!K.project.lines.length !== !$('empty').hidden) K.renderEmpty(); });
+    $('s_fps').value = K.S().fps; $('s_fps').onchange = (e) => { K.S().fps = +e.target.value; K.commit('settings'); };
 
     /* 界面语言 */
     const lg = $('lang');
     K.LANGS.forEach(([c, n]) => { const o = document.createElement('option'); o.value = c; o.textContent = n; lg.appendChild(o); });
     lg.value = K.lang; lg.onchange = () => { K.setLang(lg.value); lg.blur(); };
-    K.on('lang', () => { lg.value = K.lang; fillSamples(); shown.tm = shown.bPlay = null; });
+    const hint = () => { const k = $('keys'); k.textContent = K.keyHint(); k.title = T('bar.hintTip'); };
+    K.on('lang', () => { lg.value = K.lang; fillSamples(); Object.keys(shown).forEach((k) => (shown[k] = null)); mediaUi(); undoUi(); hint(); K.renderEmpty(); K.setVolume(media.volume, media.muted); });
 
     const sm = $('samples');
     fillSamples();
-    sm.onchange = () => { if (sm.value === '') return; if (!K.dirty || confirm(T('msg.confirmSample'))) { fileHandle = null; K.setProject(K.normalizeProject(K.SAMPLES[+sm.value].project)); K.ensureFont(); } sm.value = ''; sm.blur(); };
-    $('bNew').onclick = () => { if (!K.dirty || confirm(T('msg.confirmNew'))) { fileHandle = null; const p = K.blank(); p.settings = K.cleanSettings(K.S()); K.setProject(p); } };
+    sm.onchange = () => { const v = sm.value; sm.value = ''; sm.blur(); if (v !== '') K.loadSample(+v); };
+    $('bNew').onclick = () => K.newProject();
     $('bOpen').onclick = () => openDialog();
     $('bSave').onclick = save; $('bSaveAs').onclick = saveAs;
+    $('saveState').onclick = save;
     $('bImport').onclick = () => openDialog('.srt,.json');
-    $('bMedia').onclick = () => { const i = $('fOpen'); i.accept = 'audio/*,video/*'; i.value = ''; i.onchange = () => i.files[0] && loadMedia(i.files[0]); i.click(); };
+    $('bMedia').onclick = K.pickMedia; $('mbLoad').onclick = K.pickMedia;
+    $('mbClose').onclick = () => { bannerOff = true; mediaUi(); };
+    $('bHelp').onclick = $('keys').onclick = () => K.showHelp();
     $('bUndo').onclick = K.undo; $('bRedo').onclick = K.redo;
     $('bAdd').onclick = () => K.ops.add(K.r3(K.now() - K.S().offset));
     $('bPlay').onclick = () => (K.playing() ? K.pause() : K.play());
+    $('bLoop').onclick = () => K.toggleLoop();
+    $('speed').innerHTML = K.SPEEDS.map((v) => `<option value="${v}">${v}×</option>`).join('');
+    $('speed').onchange = (e) => K.setSpeed(e.target.value); K.setSpeed(K.ui.speed);
+    K.setVolume(K.prefNum('vol', 0, 1, 1), K.pref('muted') === true);
+    $('vol').oninput = (e) => K.setVolume(e.target.value, false);
+    $('bMute').onclick = () => K.setVolume(media.volume || 1, !media.muted);
     $('bZin').onclick = () => K.tlZoom(1.4); $('bZout').onclick = () => K.tlZoom(1 / 1.4);
-    document.querySelectorAll('#tool button').forEach((b) => (b.onclick = () => { K.ui.tool = b.dataset.v; document.querySelectorAll('#tool button').forEach((x) => x.classList.toggle('on', x === b)); }));
+    $('bFit').onclick = () => K.tlFit(); $('bFitSel').onclick = () => (K.sel() ? K.tlFitSel() : K.toast(T('msg.loopNeedSel')));
+    const setTool = (v) => { K.ui.tool = v === 'scrub' ? 'scrub' : 'retime'; document.querySelectorAll('#tool button').forEach((x) => { x.classList.toggle('on', x.dataset.v === K.ui.tool); x.setAttribute('aria-pressed', x.dataset.v === K.ui.tool); }); };
+    document.querySelectorAll('#tool button').forEach((b) => (b.onclick = () => { setTool(b.dataset.v); K.pref('tool', K.ui.tool); }));
+    setTool(K.pref('tool'));
     $('bRec').onclick = () => { document.body.classList.add('rec'); document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
     document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('rec'); });
     $('bPng').onclick = exportPng; $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
 
-    /* 拖入文件：DataTransfer 在第一次 await 之后就被清空，所以先同步取出所有文件 / 句柄，再逐个处理（工程在前、媒体在后） */
+    /* 拖入文件：DataTransfer 在第一次 await 之后就被清空，所以先同步取出所有文件 / 句柄，再排队逐个处理（工程在前、媒体在后） */
+    let dragN = 0; const dz = $('dropzone'), hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+    addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; dragN++; dz.hidden = false; });
+    addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; if (--dragN <= 0) { dragN = 0; dz.hidden = true; } });
     addEventListener('dragover', (e) => e.preventDefault());
-    addEventListener('drop', async (e) => {
-      e.preventDefault();
+    addEventListener('drop', (e) => {
+      e.preventDefault(); dragN = 0; dz.hidden = true;
       const dt = e.dataTransfer, items = [...(dt.items || [])].filter((it) => it.kind === 'file');
       const jobs = items.length
         ? items.map((it) => ({ file: it.getAsFile(), handle: it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : null }))
         : [...(dt.files || [])].map((f) => ({ file: f, handle: null }));
       jobs.sort((a, b) => (a.file && isMedia(a.file) ? 1 : 0) - (b.file && isMedia(b.file) ? 1 : 0));
-      for (const j of jobs) {
-        const h = await j.handle, f = h && h.kind === 'file' ? await h.getFile().catch(() => j.file) : j.file;
-        if (f) await openFile(f, h && h.kind === 'file' ? h : null);
-      }
+      queue(async () => {
+        for (const j of jobs) {
+          const h = await j.handle, f = h && h.kind === 'file' ? await h.getFile().catch(() => j.file) : j.file;
+          if (f) await openFile(f, h && h.kind === 'file' ? h : null);
+        }
+      });
     });
-    addEventListener('beforeunload', (e) => { if (K.dirty && fileHandle) { e.preventDefault(); e.returnValue = ''; } });
+    /* 有还没写进文件的修改（只在浏览器自动保存里）时提醒；没改过的示例不提醒 */
+    addEventListener('beforeunload', (e) => { if (K.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
-    /* 鼠标点过的按钮 / 复选框不留焦点，空格只管播放；用 Tab 聚焦的按钮按空格 / 回车照常触发按钮本身 */
-    const CTRL = 'button, summary, a[href], [role="button"], input[type="checkbox"]';
-    document.addEventListener('click', (e) => { const b = e.detail > 0 && e.target.closest && e.target.closest(CTRL); if (b) b.blur(); });
-    addEventListener('keydown', (e) => {
-      const a = document.activeElement, typing = a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || (a.tagName === 'INPUT' && !['range', 'checkbox', 'color'].includes(a.type)));
-      const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
-      if (ctrl && k === 's') { e.preventDefault(); e.shiftKey ? saveAs() : save(); return; }
-      if (ctrl && k === 'o') { e.preventDefault(); openDialog(); return; }
-      if (typing) { if (e.key === 'Escape') a.blur(); return; }
-      if ((e.code === 'Space' || e.key === 'Enter') && e.target.closest && e.target.closest(CTRL)) return;
-      if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? K.redo() : K.undo(); return; }
-      if (ctrl && k === 'y') { e.preventDefault(); K.redo(); return; }
-      if (ctrl) return;
-      const l = K.sel(), sc = K.screen(), fr = 1 / +K.S().fps;
-      const pick = (d) => { const i = l ? sc.ord.indexOf(l) + d : 0, n = sc.ord[Math.max(0, Math.min(sc.ord.length - 1, i))]; if (n) { K.select(n.id); K.tlReveal(K.ls(n) + K.S().offset); } };
-      if (e.code === 'Space') { e.preventDefault(); K.playing() ? K.pause() : K.play(); }
-      else if (e.key === 'Escape') { document.body.classList.remove('rec'); $('menu').hidden = true; }
-      else if (e.key === 'ArrowLeft') K.seek(K.now() - (e.shiftKey ? 5 : 1));
-      else if (e.key === 'ArrowRight') K.seek(K.now() + (e.shiftKey ? 5 : 1));
-      else if (e.key === ',') K.seek(K.now() - fr);
-      else if (e.key === '.') K.seek(K.now() + fr);
-      else if (e.key === 'ArrowUp') { e.preventDefault(); pick(-1); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); pick(1); }
-      else if (k === 't') { K.ui.tapArmed = true; K.invalidate(); K.ops.tap(K.r3(K.now() - K.S().offset)); }
-      else if (e.key === 'Home' && l) K.seek(Math.max(0, K.ls(l) + K.S().offset - 1));
-      else if (!l) return;
-      else if (e.key === 'Delete') K.ops.del(l);
-      else if (e.key === '[') K.ops.shift(l, e.shiftKey ? -0.1 : -0.02);
-      else if (e.key === ']') K.ops.shift(l, e.shiftKey ? 0.1 : 0.02);
-      else if (k === 'p') K.ops.set(l, 'newPara', sc.info.get(l.id).para ? (l.newPara === true ? null : false) : true);
-      else if (k === 'd') K.ops.set(l, 'dots', l.dots == null ? true : l.dots ? false : null);
-      else if (k === 'h') K.ops.dup(l);
-      else if (k === 's') K.ops.split(l, K.now() - K.S().offset);
-      else if (k === 'm') K.ops.merge(l);
-      else if (k === '0') K.ops.set(l, 'row', null);
-      else if ('1234'.includes(k)) K.ops.set(l, 'row', +k - 1);
+    addEventListener('keydown', K.keyHandler);
+    K.on('select', () => {
+      K.ui.tapArmed = false;
+      if (K.ui.loop) { const r = K.loopRange(); if (!r) K.toggleLoop(false); else if (K.now() < r[0] || K.now() > r[1]) K.seek(r[0]); }
     });
-    K.on('select', () => { K.ui.tapArmed = false; });
+    hint(); undoUi(); mediaUi(); K.renderEmpty(); loopUi();
     K.ensureFont();
+    if (first) {
+      /* 第一次来：背后放着示例（停在一句唱到一半的地方，让人一眼看懂这是做什么的），上面是欢迎页 */
+      const f = K.screen().ord[0]; if (f) K.seek(K.ls(f) + K.S().offset + 0.8);
+      K.showWelcome();
+    }
     requestAnimationFrame(frame);
   }
   boot();

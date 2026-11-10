@@ -1,3 +1,4 @@
 _test.html
 *.png
+!assets/social-preview.png
 __pycache__/

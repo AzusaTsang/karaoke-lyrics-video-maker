@@ -56,9 +56,17 @@
   K.S = () => K.project.settings;
 
   /* ---------- 事件 ---------- */
+  /* K.on 返回取消订阅函数；也可以 K.off(事件, 同一个函数)。emit 时先复制列表，回调里取消订阅也安全 */
   const handlers = {};
-  K.on = (e, f) => ((handlers[e] = handlers[e] || []).push(f));
-  K.emit = (e, a) => (handlers[e] || []).forEach((f) => f(a));
+  K.off = (e, f) => { const a = handlers[e], i = a ? a.indexOf(f) : -1; if (i >= 0) a.splice(i, 1); };
+  K.on = (e, f) => { (handlers[e] = handlers[e] || []).push(f); return () => K.off(e, f); };
+  K.emit = (e, a) => (handlers[e] || []).slice().forEach((f) => f(a));
+
+  /* 界面偏好（工具、缩放、时间线高度、速度、标签页、音量…）：和工程数据分开存；读出来的值不可信，使用处自行校验 */
+  const PK = 'karaoke-studio:prefs';
+  K.prefs = (() => { try { const j = JSON.parse(localStorage.getItem(PK) || '{}'); return j && typeof j === 'object' && !Array.isArray(j) ? j : {}; } catch (e) { return {}; } })();
+  K.pref = (k, v) => { if (v === undefined) return K.prefs[k]; K.prefs[k] = v; try { localStorage.setItem(PK, JSON.stringify(K.prefs)); } catch (e) {} return v; };
+  K.prefNum = (k, lo, hi, d) => { const v = K.prefs[k]; return typeof v === 'number' && isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
 
   /* ---------- 行 / 单元 ---------- */
   let idSeq = 1;
@@ -211,29 +219,50 @@
     return p;
   };
 
-  /* ---------- 撤销 / 重做 ---------- */
+  /* ---------- 撤销 / 重做 ----------
+     每一步记下“做了什么”（u.* 翻译 key 的后缀），撤销 / 重做按钮的提示里显示 */
   let undo = [], ptr = -1;
   const snap = () => JSON.stringify(K.project);
-  K.resetHistory = () => { undo = [snap()]; ptr = 0; };
+  K.resetHistory = () => { undo = [{ s: snap(), why: '' }]; ptr = 0; };
   K.touch = () => { K.rev++; K.emit('change'); };          // 拖动过程中的实时刷新（不入历史）
   let saveTimer = null;
-  K.commit = () => {
+  K.commit = (why) => {
     K.sortLines(); K.rev++;
-    undo.length = ptr + 1; undo.push(snap()); ptr++;
+    undo.length = ptr + 1; undo.push({ s: snap(), why: why || '' }); ptr++;
     if (undo.length > 150) { undo.shift(); ptr--; }
     K.dirty = true; K.emit('change');
     clearTimeout(saveTimer); saveTimer = setTimeout(K.autosave, 400);
   };
-  const restore = () => { K.project = JSON.parse(undo[ptr]); K.rev++; K.dirty = true; if (!K.line(K.ui.sel)) K.ui.sel = null; K.emit('load'); K.emit('change'); K.emit('select'); K.autosave(); };
+  const restore = () => { K.project = JSON.parse(undo[ptr].s); K.rev++; K.dirty = true; if (!K.line(K.ui.sel)) K.ui.sel = null; K.emit('load'); K.emit('change'); K.emit('select'); K.autosave(); };
   K.undo = () => { if (ptr > 0) { ptr--; restore(); } };
   K.redo = () => { if (ptr < undo.length - 1) { ptr++; restore(); } };
+  K.canUndo = () => ptr > 0;
+  K.canRedo = () => ptr < undo.length - 1;
+  K.undoWhy = () => (ptr > 0 ? undo[ptr].why : null);
+  K.redoWhy = () => (ptr < undo.length - 1 ? undo[ptr + 1].why : null);
 
-  const AK = 'karaoke-studio:autosave';
-  K.autosave = () => { try { localStorage.setItem(AK, JSON.stringify(K.project)); } catch (e) {} };
+  /* 自动保存：工程本身 + 元信息（是否有未存进文件的修改、来源、关联文件名），刷新后保存状态提示仍然准确 */
+  const AK = 'karaoke-studio:autosave', MK = 'karaoke-studio:autosave-meta';
+  const SRC = ['new', 'sample', 'file', 'import', 'download'];
+  K.doc = { src: 'new', name: '' };        // 来源：new / sample / file（打开的工程）/ import（SRT 等）/ download（另存为下载）；name = 关联的文件名
+  K.autosaveOk = true;
+  K.autosave = () => {
+    try { localStorage.setItem(AK, JSON.stringify(K.project)); localStorage.setItem(MK, JSON.stringify({ dirty: K.dirty, src: K.doc.src, name: K.doc.name })); K.autosaveOk = true; }
+    catch (e) { K.autosaveOk = false; }
+  };
   K.loadAutosave = () => { try { const j = JSON.parse(localStorage.getItem(AK) || 'null'); return j && j.lines ? j : null; } catch (e) { return null; } };
+  K.loadAutosaveMeta = () => {
+    let m = null; try { m = JSON.parse(localStorage.getItem(MK) || 'null'); } catch (e) {}
+    m = m && typeof m === 'object' ? m : {};
+    return { dirty: m.dirty === true, src: SRC.includes(m.src) ? m.src : 'new', name: str(m.name, 260) };
+  };
+  /* 写进文件之后调用：清掉未保存标记，并同步元信息 */
+  K.markSaved = (name, src) => { K.dirty = false; K.doc = { src: src || 'file', name: name || '' }; K.autosave(); K.emit('saved'); };
 
-  K.setProject = (p, keepDirty) => {
+  /* doc：{src, name}，说明这个工程从哪来（保存状态提示用） */
+  K.setProject = (p, keepDirty, doc) => {
     K.project = p; K.ui.sel = null; K.rev++; K.dirty = !!keepDirty; K.resetHistory();
+    K.doc = Object.assign({ src: 'new', name: '' }, doc);
     K.emit('load', 'project'); K.emit('change'); K.emit('select'); K.autosave();
   };
 })();

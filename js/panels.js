@@ -124,14 +124,15 @@
       if (d.o) { applyOv(e, true); return; }
       if (d.of) { K.setOv(l, 'font', K.cleanSetting('font', `'${v.replace(/'/g, '')}', ${FALLBACK}`) || FALLBACK); K.commit('lineStyle'); K.ensureFont(); return; }
       if (d.k === 'text') { if (K.retext(l, v)) K.commit('text'); else buildLine(); }
-      else if (d.k === 'start') K.ops.shift(l, parseFloat(v) - K.ls(l));
+      else if (d.k === 'start') { const v2 = parseFloat(v); if (isFinite(v2)) K.ops.shift(l, Math.max(0, v2) - K.ls(l)); else buildLine(); }          // 清空 / 不是数字：恢复原值
       else if (d.k === 'end') { const v2 = parseFloat(v); if (isFinite(v2)) { K.setEnd(l, Math.max(v2, K.minEnd(l))); K.commit('timing'); } else buildLine(); }
       else if (d.k === 'row') K.ops.set(l, 'row', v === '' ? null : +v);
       else if (d.k === 'align') K.ops.set(l, 'align', v || null);
       else if (d.k === 'newPara') K.ops.set(l, 'newPara', untri(v));
       else if (d.k === 'dots') K.ops.set(l, 'dots', untri(v));
-      else if (d.k === 'showAt') K.ops.set(l, 'showAt', Math.min(parseFloat(v), K.ls(l) - 0.05));
-      else if (d.k === 'hideAt') K.ops.set(l, 'hideAt', Math.max(parseFloat(v), K.ls(l) + 0.1));
+      /* 出现 / 消失时间：清空 = 恢复自动 */
+      else if (d.k === 'showAt') { const v2 = parseFloat(v); K.ops.set(l, 'showAt', isFinite(v2) ? Math.min(v2, K.ls(l) - 0.05) : null); }
+      else if (d.k === 'hideAt') { const v2 = parseFloat(v); K.ops.set(l, 'hideAt', isFinite(v2) ? Math.max(v2, K.ls(l) + 0.1) : null); }
       else if (d.r != null) { l.units[+d.r].r = v || null; K.commit('text'); }
       else if (d.b != null) { const b = K.bounds(l)[+d.b]; if (b && !isNaN(parseFloat(v))) { K.setBoundary(l, b.i, b.j, parseFloat(v)); K.commit('timing'); } }
     });

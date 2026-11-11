@@ -29,7 +29,8 @@
   /* ---------- 循环选中行：从行首前 PRE 秒到行尾后 POST 秒反复播放；循环范围跟着选中行走 ---------- */
   const PRE = 1, POST = 0.4;
   K.ui.loop = false;
-  K.loopRange = () => { const l = K.ui.loop && K.sel(); if (!l) return null; const o = K.S().offset; return [Math.max(0, K.r3(K.ls(l) + o - PRE)), Math.min(K.dur(), K.r3(l.end + o + POST))]; };
+  /* 有媒体时循环终点比媒体结尾早一点：播到结尾媒体会自己停下，就来不及跳回去了 */
+  K.loopRange = () => { const l = K.ui.loop && K.sel(); if (!l) return null; const o = K.S().offset, a = Math.max(0, K.r3(K.ls(l) + o - PRE)); return [a, Math.max(a, Math.min(K.dur() - (mode ? 0.08 : 0), K.r3(l.end + o + POST)))]; };
   const loopUi = () => { const b = $('bLoop'); b.classList.toggle('on', K.ui.loop); b.setAttribute('aria-pressed', K.ui.loop); };
   K.toggleLoop = (on) => {
     on = on == null ? !K.ui.loop : !!on;
@@ -59,6 +60,7 @@
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     const wasPlaying = K.playing(), t = K.now(); K.pause();
     if (mode === 'yt') Y.detach();                      // 本地文件优先；工程里的 YouTube 链接保留
+    held = null;                                        // 之前留着备用的文件被这个新文件取代
     mediaUrl = URL.createObjectURL(f); media.src = mediaUrl; mode = 'file'; fileName = f.name; K.peaks = null; applyRate(); K.invalidate();
     K.project.mediaName = f.name; mediaUi();
     media.onloadedmetadata = () => { if (tok !== mediaTok) return; K.project.duration = Math.ceil(media.duration * 100) / 100; applyRate(); if (t > 0 && t < media.duration) media.currentTime = t; syncEnd(); K.autosave(); K.invalidate(); if (wasPlaying) K.play(); };
@@ -80,21 +82,33 @@
   }
   K.loadMedia = loadMedia;
   /* 换成 YouTube 视频（从当前时间接着走）。播放器出错时退回无声时钟 */
+  /* 已载入的本地文件先留着（held），等 YouTube 播放器真的能用了再放掉；播放器出错 / 链接被移除时换回这个文件 */
+  let held = null;
+  const releaseFile = () => { media.removeAttribute('src'); media.load(); if (mediaUrl) URL.revokeObjectURL(mediaUrl); mediaUrl = null; fileName = ''; held = null; };
+  const backToFile = (t) => { mode = 'file'; K.peaks = held.peaks; held = null; if (isFinite(media.duration)) media.currentTime = Math.max(0, Math.min(media.duration, t)); };
+  /* 播放器报告的时长可能晚一点才有（刚就绪时是 0）：每次状态变化都对一下 */
+  const ytDur = () => { const d = Y.dur(), v = Math.ceil(d * 100) / 100; if (d > 0 && K.project.duration !== v) { K.project.duration = v; syncEnd(); } };
   function useYt(id) {
-    const wasPlaying = K.playing(), t = K.now(); K.pause();
     if (!Y.available()) { ytFail = id; return; }
-    ++mediaTok;                                          // 丢掉还在加载的本地文件
-    if (mode === 'file') { media.removeAttribute('src'); media.load(); if (mediaUrl) URL.revokeObjectURL(mediaUrl); mediaUrl = null; fileName = ''; K.peaks = null; }
+    const wasPlaying = K.playing(), t = K.now(); K.pause();
+    if (mode === 'file') {
+      if (media.readyState >= 1) { held = { peaks: K.peaks }; K.peaks = null; }      // 能播的文件留着备用
+      else { ++mediaTok; releaseFile(); K.peaks = null; }                             // 还在加载的本地文件直接丢掉
+    }
     mode = 'yt'; ytFail = '';
     Y.attach(id, t, {
-      ready: () => { const d = Y.dur(); if (d > 0) K.project.duration = Math.ceil(d * 100) / 100; applyRate(); syncEnd(); mediaUi(); K.invalidate(); },
-      state: () => { mediaUi(); K.invalidate(); },
-      error: (why, t0) => { if (mode !== 'yt') return; mode = ''; ytFail = id; clk.t = t0; clk.playing = false; mediaUi(); K.toast(T('yt.fail', { why: K.ytWhy(why) }), 'error'); },
+      ready: () => { if (held) { ++mediaTok; releaseFile(); } ytDur(); applyRate(); syncEnd(); mediaUi(); K.invalidate(); },
+      state: () => { ytDur(); mediaUi(); K.invalidate(); },
+      error: (why, t0) => {
+        if (mode !== 'yt') return;
+        ytFail = id; if (held) backToFile(t0); else { mode = ''; clk.t = t0; clk.playing = false; }
+        mediaUi(); K.invalidate(); K.toast(T('yt.fail', { why: K.ytWhy(why) }), 'error');
+      },
     });
     if (wasPlaying) Y.play();
     mediaUi(); K.invalidate();
   }
-  function dropYt() { if (mode !== 'yt') return; const t = K.now(); Y.detach(); mode = ''; clk.t = t; clk.playing = false; mediaUi(); K.invalidate(); }
+  function dropYt() { if (mode !== 'yt') return; const t = K.now(); Y.detach(); if (held) backToFile(t); else { mode = ''; clk.t = t; clk.playing = false; } mediaUi(); K.invalidate(); }
   /* 工程变了（打开 / 新建 / 撤销）：让播放器跟上工程里的 YouTube 链接。
      已载入本地文件时，只有换了工程、而且这个文件不是新工程记着的那个，才换成 YouTube */
   function syncYt(why) {
@@ -106,7 +120,7 @@
   /* 「使用 YouTube 视频」对话框 / 拖入链接：id = '' 表示移除链接 */
   K.setYouTube = (id) => {
     if ((K.project.youtube || '') !== id) { K.project.youtube = id; K.commit('media'); }
-    if (id) { useYt(id); if (!Y.available()) K.toast(T('yt.fail', { why: K.ytWhy('network') }), 'error'); } else dropYt();
+    if (id) { useYt(id); if (!Y.available()) K.toast(T('yt.fail', { why: K.ytWhy(location.protocol === 'file:' ? 'file' : 'network') }), 'error'); } else dropYt();
   };
   K.mediaMenu = (btn) => {
     const r = btn.getBoundingClientRect();
@@ -264,8 +278,9 @@
   const setText = (id, s) => { if (shown[id] !== s) { shown[id] = s; $(id).textContent = s; } };
   const setOnce = (k, v, fn) => { if (shown[k] !== v) { shown[k] = v; fn(); } };
   K.tick = (ts) => {
-    if (!mode && clk.playing) { clk.t += ((ts - clk.last) / 1000) * K.ui.speed; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; } }
-    const lr = K.loopRange(); if (lr && K.playing() && (K.now() >= lr[1] || (!mode && clk.t >= K.dur()))) { K.seek(lr[0]); if (!K.playing()) K.play(); }
+    let ended = false;                       // 内部时钟这一帧走到了结尾（循环中要跳回去，而不是停下）
+    if (!mode && clk.playing) { clk.t += ((ts - clk.last) / 1000) * K.ui.speed; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; ended = true; } }
+    const lr = K.loopRange(); if (lr && (ended || (K.playing() && K.now() >= lr[1]))) { K.seek(lr[0]); if (!K.playing()) K.play(); }
     const t = K.now();
     K.drawStage(mode === 'file' ? media : null);
     if (mode === 'yt') Y.layout(cv, K.S().useVideoBg);
@@ -352,12 +367,16 @@
     let dragN = 0; const dz = $('dropzone'), hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
     addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; dragN++; dz.hidden = false; });
     addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; if (--dragN <= 0) { dragN = 0; dz.hidden = true; } });
-    addEventListener('dragover', (e) => e.preventDefault());
+    /* 往输入框里拖文字是浏览器自带的操作，不拦；其余地方接收文件 / YouTube 链接 */
+    const intoField = (e) => !hasFiles(e) && !!(e.target && e.target.closest && e.target.closest('input, textarea, [contenteditable]'));
+    addEventListener('dragover', (e) => { if (!intoField(e)) e.preventDefault(); });
     addEventListener('drop', (e) => {
+      if (intoField(e)) return;
       e.preventDefault(); dragN = 0; dz.hidden = true;
       const dt = e.dataTransfer, items = [...(dt.items || [])].filter((it) => it.kind === 'file');
       /* 没有文件、拖进来的是 YouTube 链接（如从地址栏 / 别的标签页）：用这个视频 */
-      if (!items.length && !(dt.files && dt.files.length)) { const id = K.ytId((dt.getData('text/uri-list') || dt.getData('text/plain') || '').split('\n')[0]); if (id) queue(() => K.setYouTube(id)); return; }
+      /* 只认链接：光是 11 个字母数字（K.ytId 也接受的裸 ID）可能只是一个普通的词 */
+      if (!items.length && !(dt.files && dt.files.length)) { const s = (dt.getData('text/uri-list') || dt.getData('text/plain') || '').split('\n')[0].trim(), id = /[./]/.test(s) ? K.ytId(s) : ''; if (id) queue(() => K.setYouTube(id)); return; }
       const jobs = items.length
         ? items.map((it) => ({ file: it.getAsFile(), handle: it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : null }))
         : [...(dt.files || [])].map((f) => ({ file: f, handle: null }));

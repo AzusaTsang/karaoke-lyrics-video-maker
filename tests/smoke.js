@@ -1252,6 +1252,48 @@ window.addEventListener('load', async () => {
       K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; await frames(2);
       ok('ytCleanup', K.mediaMode() === '' && K.yt.available() === false && document.getElementById('bYtSet').hidden && document.getElementById('ytBar').hidden); }
 
+    /* ---- 代码审查修复的回归：输入框里的 ?、清空的数字框、拖入普通文字、歌曲末尾的循环 ---- */
+    { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; await frames(2);
+      const l = K.screen().ord[0]; K.select(l.id); await frames(2);
+      const q = (k) => document.querySelector('#tab-line [data-k="' + k + '"]');
+      const kd = (el, k, code) => { const e = new KeyboardEvent('keydown', { key: k, code: code || k, shiftKey: k === '?', bubbles: true, cancelable: true }); el.dispatchEvent(e); return e.defaultPrevented; };
+      // 输入框里按 ? 是打字，不是打开帮助；F1 仍然打开帮助
+      const ta = document.getElementById('lnText'); ta.focus();
+      const p1 = kd(ta, '?', 'Slash'); await frames(1);
+      ok('questionMarkTypesInField', !p1 && !document.querySelector('dialog.help'), { prevented: p1 });
+      const ti = document.getElementById('title'); ti.focus(); const p2 = kd(ti, '?', 'Slash'); await frames(1);
+      ok('questionMarkTypesInTitle', !p2 && !document.querySelector('dialog.help')); ti.blur();
+      ta.focus(); const p3 = kd(ta, 'F1'); await frames(1); const hd = document.querySelector('dialog.help');
+      ok('f1StillOpensHelpInField', p3 && !!hd); if (hd) hd.querySelector('[data-x]').click(); await frames(1);
+      document.activeElement && document.activeElement.blur(); kd(document.body, '?', 'Slash'); await frames(1); const hd2 = document.querySelector('dialog.help');
+      ok('questionMarkOpensHelpOutsideFields', !!hd2); if (hd2) hd2.querySelector('[data-x]').click(); await frames(2);
+      // 清空「开始」：时间不变（以前整行被压到 0 秒、行结束变成 NaN）
+      const snap = () => JSON.stringify([K.sel().units.map((u) => u.s), K.sel().end]), s0 = snap();
+      let f = q('start'); f.value = ''; f.dispatchEvent(new Event('change', { bubbles: true })); await frames(2);
+      ok('emptyStartKeepsTiming', snap() === s0 && isFinite(K.sel().end) && q('start').value === K.ls(K.sel()).toFixed(2), { now: snap().slice(0, 80) });
+      f = q('start'); f.value = '-5'; f.dispatchEvent(new Event('change', { bubbles: true })); await frames(2);
+      ok('negativeStartClampsToZero', K.ls(K.sel()) === 0 && K.sel().units.every((u) => isFinite(u.s) && u.s >= 0)); K.undo(); await frames(2); K.select(K.screen().ord[0].id); await frames(2);
+      // 清空「出现 / 消失时间」= 恢复自动（以前写进 NaN）
+      f = q('showAt'); f.value = (K.ls(K.sel()) - 1).toFixed(2); f.dispatchEvent(new Event('change', { bubbles: true })); await frames(2);
+      const hadShow = K.sel().showAt != null;
+      f = q('showAt'); f.value = ''; f.dispatchEvent(new Event('change', { bubbles: true })); await frames(2);
+      ok('emptyShowAtIsAuto', hadShow && K.sel().showAt === null && isFinite(K.screen().info.get(K.sel().id).show));
+      f = q('hideAt'); f.value = ''; f.dispatchEvent(new Event('change', { bubbles: true })); await frames(2);
+      ok('emptyHideAtIsAuto', K.sel().hideAt === null && isFinite(K.screen().info.get(K.sel().id).hide) && !/NaN/.test(document.getElementById('tab-line').innerHTML));
+      K.ops.shift(K.sel(), NaN); ok('shiftIgnoresNaN', snap() === s0);
+      // 拖进来一个普通的词（碰巧 11 个字母）不当作 YouTube ID；拖到输入框里的文字交给浏览器
+      const drop = (target, text) => { const dt = new DataTransfer(); dt.setData('text/plain', text); const e = new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }); target.dispatchEvent(e); return e.defaultPrevented; };
+      const pd = drop(document.body, 'information'); await K.fileQueue(); await frames(1);
+      ok('dropPlainWordIgnored', pd && K.project.youtube === '', K.project.youtube);
+      const pf = drop(document.getElementById('lnText'), 'https://youtu.be/dQw4w9WgXcQ'); await K.fileQueue(); await frames(1);
+      ok('dropIntoFieldIsNative', !pf && K.project.youtube === '', { prevented: pf, yt: K.project.youtube });
+      // 循环：最后一行贴着歌曲结尾时照样跳回去（以前内部时钟到头就停了）
+      const last = K.screen().ord.slice(-1)[0]; K.project.duration = K.r3(last.end + 0.1); K.select(last.id); K.pause(); K.toggleLoop(true);
+      const lr = K.loopRange(); let ts = performance.now(), wrapped = false, prev = K.now();
+      for (let i = 0; i < 400; i++) { ts += 50; K.tick(ts); if (K.now() < prev - 0.5) wrapped = true; prev = K.now(); }
+      ok('loopWrapsAtSongEnd', wrapped && K.playing() && lr && near(lr[1], K.dur(), 1e-6) && K.now() >= lr[0] - 1e-6 && K.now() <= lr[1] + 1e-6, { wrapped, playing: K.playing(), now: K.now(), lr });
+      K.toggleLoop(false); K.pause(); K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; await frames(2); }
+
   } catch (e) { out.error = String(e && e.stack || e); }
   const pre = document.createElement('pre'); pre.id = 'result';
   const head = out.error ? `FAIL: exception (${fails.length} failed of ${n} checks before it)` : fails.length ? `FAIL: ${fails.length} of ${n} checks failed` : `PASS: ${n} checks`;

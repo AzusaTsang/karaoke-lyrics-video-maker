@@ -10,8 +10,7 @@ No installation and no build step: open `index.html` in Chrome or Edge, or host 
 
 ![Karaoke Lyrics Video Maker](assets/social-preview.svg)
 
-**Try it online:** `https://<your-github-username>.github.io/karaoke-studio/`
-(this is a placeholder - replace it with the URL of your own GitHub Pages deployment, see [Deploying to GitHub Pages](#deploying-to-github-pages))
+**Try it online:** https://azusatsang.github.io/karaoke-lyrics-video-maker/
 
 ## Features
 

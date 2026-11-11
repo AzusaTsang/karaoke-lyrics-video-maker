@@ -10,8 +10,7 @@ Premiere Pro などにそのまま読み込める**透明 PNG 連番**の書き�
 
 ![カラオケ歌詞動画メーカー](assets/social-preview.svg)
 
-**オンラインで試す：** `https://<your-github-username>.github.io/karaoke-studio/`
-（これはプレースホルダーです。ご自身の GitHub Pages の URL に置き換えてください。手順は[GitHub Pages への公開](#github-pages-への公開)を参照）
+**オンラインで試す：** https://azusatsang.github.io/karaoke-lyrics-video-maker/
 
 ## 機能
 

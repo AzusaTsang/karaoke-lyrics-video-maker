@@ -1,8 +1,8 @@
 /* 主程序：播放时钟（速度 / 循环 / 音量）、媒体、工程文件、保存状态、导入导出、启动 */
 (function () {
   const K = window.K, $ = (id) => document.getElementById(id), T = K.t;
-  /* 发布信息：仓库地址只在这里写一次（帮助 → 关于里会显示）。发布前把 <your-github-username> 换成自己的用户名 */
-  K.APP = { version: '1.0.0', repo: 'https://github.com/<your-github-username>/karaoke-studio' };
+  /* 发布信息：仓库地址只在这里写一次（帮助 → 关于里会显示）。fork 后改成自己的仓库地址 */
+  K.APP = { version: '1.0.0', repo: 'https://github.com/AzusaTsang/karaoke-lyrics-video-maker' };
   const media = $('media'); let hasMedia = false;
   const clk = { playing: false, t: 0, last: 0 };
   K.hasMedia = () => hasMedia;

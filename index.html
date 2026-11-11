@@ -9,6 +9,9 @@
   gtag('js', new Date());
   gtag('config', 'G-2KFRZ0YXBY');
 </script>
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9423008043392488"
+     crossorigin="anonymous"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Karaoke Lyrics Video Maker</title>
@@ -30,6 +33,11 @@
 <meta name="twitter:image" content="https://azusatsang.github.io/karaoke-lyrics-video-maker/assets/social-preview.png">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/app.css">
+<style>/* 仅在线版：仓库 / 广告按钮与广告对话框 */
+#bRepo svg{width:14px;height:14px;vertical-align:-2px;fill:currentColor}
+dialog.dlg.ad{width:min(760px,calc(100vw - 24px))}
+.dlg.ad .adbox{min-height:120px;margin:8px 0}
+</style>
 </head>
 <body>
 <noscript><div class="noscript"><b>Karaoke Lyrics Video Maker</b> runs entirely in your browser and needs JavaScript. Please enable JavaScript, or open this page in Chrome or Edge.</div></noscript>
@@ -54,6 +62,8 @@
       <button id="bYtSet" data-i18n="yt.set" data-i18n-title="yt.setTip" hidden>Player settings</button>
     </span>
     <span class="grp right">
+      <button id="bRepo" class="ico" data-i18n-aria="on.repo" data-i18n-title="on.repoTip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></button>
+      <button id="bAd" data-i18n="on.ad" data-i18n-title="on.adTip">Ad</button>
       <button id="bUndo" class="ico" data-i18n-aria="top.undo">↶</button><button id="bRedo" class="ico" data-i18n-aria="top.redo">↷</button>
       <button id="bRec" data-i18n="top.rec" data-i18n-title="top.recTip">Record Mode</button>
       <button id="bHelp" class="ico" data-i18n-aria="top.help" data-i18n-title="top.helpTip">?</button>
@@ -131,6 +141,7 @@
 
 <script src="js/state.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/online.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ops.js"></script>
 <script src="js/dialogs.js"></script>

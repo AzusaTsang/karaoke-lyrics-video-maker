@@ -61,7 +61,17 @@ a{color:var(--acc)}
 #center{grid-row:2;display:flex;flex-direction:column;min-width:0;min-height:0;padding:8px;gap:6px}
 #stageBox{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;
   background:conic-gradient(#33363d 25%,#26292f 0 50%,#33363d 0 75%,#26292f 0) 0 0/22px 22px}
-#cv{display:block;max-width:100%;max-height:100%;touch-action:none}
+#cv{position:relative;z-index:1;display:block;max-width:100%;max-height:100%;touch-action:none}
+/* YouTube 播放器：盖住画布所在的区域、在画布下面，不接收鼠标；不开视频背景时调暗 */
+#ytBox{position:absolute;z-index:0;background:#000;pointer-events:none}
+#ytBox[hidden]{display:none}
+#ytBox.dim{opacity:.3}
+/* 播放器设置模式：播放器放到歌词上面，可以直接操作 YouTube 自己的控制条和 ⚙ 菜单 */
+#ytBox.front{z-index:3;pointer-events:auto;opacity:1}
+#ytBar{z-index:4;border-color:#2c4f7a}
+#ytBar .ic{color:var(--acc)}
+body.rec #ytBar{display:none}
+#ytBox iframe,#ytBox>div{display:block;width:100%;height:100%;border:0}
 .banner{position:absolute;left:10px;right:10px;top:10px;display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;background:rgba(26,29,35,.94);border:1px solid #6b5222;box-shadow:0 4px 18px #0008;z-index:2}
 .banner .ic{color:var(--warn);font-size:16px;flex:none}
 .banner .msg{flex:1;min-width:0}
@@ -183,6 +193,9 @@ table.keys td.k{width:40%;font-family:inherit;font-size:12px;color:#cfd5de}
 table.keys tr td:first-child{font-family:inherit;font-size:12px}
 .dlg.paste{width:min(680px,calc(100vw - 24px))}
 .dlg.paste textarea{min-height:190px;font-size:15px;line-height:1.6;margin-top:2px}
+dialog.dlg.yt{width:min(520px,calc(100vw - 24px))}
+.dlg.yt input[type=url]{width:100%;padding:5px 8px;margin-top:2px}
+.dlg.yt #ytMsg{color:var(--warn);min-height:1.2em;margin:4px 0 0}
 .opts{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);gap:8px 10px;align-items:center;margin:10px 0 4px}
 .opts label{color:var(--mut);font-size:12px;line-height:1.25}
 .opts select,.opts input{min-width:0;width:100%}

@@ -34,12 +34,13 @@ No installation and no build step: open `index.html` in Chrome or Edge, or host 
 - Auto furigana: kuromoji adds readings above kanji in the browser (the dictionary is downloaded only when you ask for it, after a confirmation)
 - Export: transparent PNG sequence (to a folder, or as ZIP download in any browser), single frame PNG, a clean "screen recording" view, and lyrics files (LRC / SRT / ASS karaoke)
 - Interface language switcher (中文 / 日本語 / English)
-- Two sample projects built in (Japanese with furigana, French)
+- Time against a YouTube video instead of a local file: paste a link and the picture plays under the lyrics in the preview (needs an internet connection)
+- Two sample projects built in (Japanese with furigana, French), with audio from the MV on YouTube
 
 ## Quick start
 
 1. **Open the app.** Open `index.html` in Chrome or Edge (or visit your hosted copy). On your first visit a welcome guide offers to play the built-in sample, import lyrics, open a project or start empty; the sample is already loaded behind it. Reopen the guide any time from the **?** button.
-2. **Load the audio or video** (*Load Media…* in the top bar, or drag the file into the window). Lyric times follow its playback time. If a project names a media file that is not loaded, a banner over the preview says so; without media, playback runs on a silent internal clock (shown as *Silent clock* next to the time).
+2. **Load the audio or video** (*Load Media…* in the top bar → a local file or a YouTube video, or drag the file / a YouTube link into the window). Lyric times follow its playback time. A YouTube link is saved in the project; YouTube videos have no waveform, and the page must be opened over http(s) (YouTube can't be embedded from file://). For a video with several audio tracks (e.g. dubs), click *Player settings* in the top bar and pick the track from the YouTube player's ⚙ menu; the browser remembers it. If a project names a media file that is not loaded, a banner over the preview says so; without media, playback runs on a silent internal clock (shown as *Silent clock* next to the time).
 3. **Add lyrics.** *Add lyrics…* → *Paste or type lyrics…* takes plain text, one line per row (see [Adding lyrics](#adding-lyrics)); *Import an SRT / LRC / JSON file…* takes an SRT or plain LRC file (each line's characters are spread evenly over its time; you retime afterwards), an enhanced LRC, or an aligned JSON from `tools/align`. The *Samples…* menu has two ready-made projects.
 4. **Retime and lay out** (see the editing reference below).
 5. **Save** with `Ctrl+S` to a `.kara.json` project file (lyrics, timing and style are stored in it). The browser also keeps an autosave, but only as a safety net (see [Saving](#saving)).

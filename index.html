@@ -42,6 +42,7 @@
       <select id="samples" data-i18n-title="top.samplesTip" data-i18n-aria="top.samplesTip"><option value="" data-i18n="top.samples">Samples…</option></select>
       <button id="bMedia" data-i18n="top.media" data-i18n-title="top.mediaTip">Load Media…</button>
       <span id="mediaName" class="hint"></span>
+      <button id="bYtSet" data-i18n="yt.set" data-i18n-title="yt.setTip" hidden>Player settings</button>
     </span>
     <span class="grp right">
       <button id="bUndo" class="ico" data-i18n-aria="top.undo">↶</button><button id="bRedo" class="ico" data-i18n-aria="top.redo">↷</button>
@@ -59,6 +60,8 @@
 
   <main id="center">
     <div id="stageBox">
+      <div id="ytBox" hidden></div>
+      <div id="ytBar" class="banner" role="status" hidden><span class="ic" aria-hidden="true">⚙</span><span class="msg" data-i18n="yt.setHint"></span><button class="pri" data-i18n="yt.done">Done</button></div>
       <canvas id="cv" width="1920" height="1080" data-i18n-aria="stage.label" role="img"></canvas>
       <div id="mbanner" class="banner" role="status" hidden>
         <span class="ic" aria-hidden="true">♪</span><span class="msg"><span class="tx"></span> <span class="sub hint"></span></span>
@@ -131,6 +134,7 @@
 <script src="js/timeline.js"></script>
 <script src="js/panels.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/youtube.js"></script>
 <script>window.K.SAMPLES = [];</script>
 <script src="samples/hydro_king_jp.js"></script>
 <script src="samples/hydro_king_fr.js"></script>

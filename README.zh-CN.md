@@ -9,8 +9,7 @@
 
 ![卡拉OK歌词视频制作器](assets/social-preview.svg)
 
-**在线试用：** `https://<your-github-username>.github.io/karaoke-studio/`
-（这只是占位地址，请换成你自己部署后的 GitHub Pages 地址，见[部署到 GitHub Pages](#部署到-github-pages)）
+**在线试用：** https://azusatsang.github.io/karaoke-lyrics-video-maker/
 
 ## 功能
 

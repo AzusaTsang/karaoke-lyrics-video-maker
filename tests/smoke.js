@@ -887,6 +887,24 @@ window.addEventListener('load', async () => {
         q('summary.lsoS').click(); await wait(30); ok('lsoCollapsePref', K.pref('lsOpen') === false);
         K.select(other.id); await wait(40); ok('lsoStaysCollapsed', !tab.querySelector('details.lso').open); delete K.prefs.lsOpen; }
 
+      /* U4b. 预备点位置（全局 dotPos + 行覆盖）：top = 行首上方，left = 行首左边、和文字同高 */
+      { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.S().offset = 0; K.touch(); const sc1 = K.screen();
+        const l = sc1.ord.find((x) => sc1.info.get(x.id).dotsDur === 3), I = sc1.info.get(l.id), t = K.ls(l) - 2.9;
+        const cv = document.createElement('canvas'); cv.width = 1920; cv.height = 1080; const g = cv.getContext('2d', { willReadFrequently: true });
+        const ink = (x0, y0, x1, y1) => { const d = g.getImageData(Math.max(0, x0), Math.max(0, y0), Math.max(1, x1 - Math.max(0, x0)), Math.max(1, y1 - y0)).data; let c = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 128) c++; return c; };
+        const probe = () => { K.touch(); K.render(g, t, { bg: 'none' }); const G = K.geo(l, K.screen().info.get(l.id), 1920, 1080), R0 = G.rows[0], top = R0.y - G.top * G.s, E = K.LS(l);
+          return { above: ink(Math.round(R0.x0), Math.round(top - E.size), Math.round(R0.x0 + E.size * 2), Math.round(top - 2)), left: ink(Math.round(R0.x0 - E.size * 2), Math.round(R0.y - E.size * 0.7), Math.round(R0.x0 - E.strokeW - 2), Math.round(R0.y)) }; };
+        ok('dotPosDefault', K.DEF.dotPos === 'top' && K.S().dotPos === 'top' && K.cleanSetting('dotPos', 'left') === 'left' && K.cleanSetting('dotPos', 'bottom') === undefined && K.LSTYLE.includes('dotPos'));
+        const pTop = probe(); K.S().dotPos = 'left'; const pLeft = probe();
+        K.setOv(l, 'dotPos', 'top'); const pOvTop = probe(); K.S().dotPos = 'top'; K.setOv(l, 'dotPos', 'left'); const pOvLeft = probe();
+        out.dotPos = { pTop, pLeft, pOvTop, pOvLeft, o: l.o };
+        ok('dotPosTop', pTop.above > 50 && pTop.left === 0 && pOvTop.above > 50 && pOvTop.left === 0, out.dotPos);
+        ok('dotPosLeft', pLeft.left > 50 && pLeft.above === 0 && pOvLeft.left > 50 && pOvLeft.above === 0, out.dotPos);
+        ok('dotPosOverrideSaved', l.o && l.o.dotPos === 'left' && K.cleanOverrides({ dotPos: 'x' }) === null);
+        K.select(l.id); await wait(60);
+        ok('dotPosForms', !!document.querySelector('#tab-layout select[data-s="dotPos"]') && !!document.querySelector('#tab-line select[data-o="dotPos"]') && document.querySelector('#tab-line select[data-o="dotPos"]').value === 'left');
+        K.setOv(l, 'dotPos', null); K.touch(); }
+
       /* U5. 预备点时长按行：screen 的出现时间 / 预备点时长跟着变；时间线拖动预备点起点、双击恢复自动 */
       { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.S().offset = 0; K.touch(); const sc1 = K.screen();
         const l = sc1.ord.find((x, i) => { const I = sc1.info.get(x.id); return i > 0 && I.para && I.dotsDur === 3 && x.showAt == null && K.ls(x) - Math.max(...sc1.ord.slice(0, i).map((y) => sc1.info.get(y.id).hide + K.S().fadeOut)) > 5; }), id = l.id, I0 = sc1.info.get(id), s = K.ls(l);

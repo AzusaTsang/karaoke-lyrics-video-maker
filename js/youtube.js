@@ -30,7 +30,8 @@
   let rate = 1, vol = 1, muted = false, seekT = null, seekTimer = 0, seekAt = 0;
   /* 预热：播放器载入后静音播一下马上暂停在 base，让它进入「已开始、暂停中」——这样暂停时跳转能显示对应画面，
      设置模式里也直接有控制条（未开始时只有缩略图和大播放按钮，点了会从 0 秒开始） */
-  let priming = false, primeTimer = 0;
+  let priming = false, primePaused = false;   // primePaused：预热那一下的 pauseVideo 已经发出，还没收到 PAUSED
+  let swallowPause = false, pendingPause = false;   // 迟到的预热 PAUSED 不算用户暂停；播放还没真正开始时按了暂停，等 PLAYING 到了再停
   const live = () => ready && !priming && (state === ST.PLAYING || state === ST.BUFFERING || state === ST.PAUSED);
   const pnow = () => performance.now();
 
@@ -38,7 +39,7 @@
     if (!live()) return base;
     const r = +P.getCurrentTime() || 0, n = pnow();
     if (hold) {
-      if (Math.abs(r - hold.t) < 0.4 || n > hold.until) hold = null;
+      if (Math.abs(r - hold.t) < 0.4 || (n > hold.until && state !== ST.BUFFERING)) hold = null;      // 还在缓冲 = 还没跳到，继续当作已经到了
       else return hold.t;
     }
     if (r !== raw) { raw = r; rawAt = n; }
@@ -52,18 +53,23 @@
     return want;
   };
   const play = () => {
-    want = true; wantAt = pnow();
+    want = true; wantAt = pnow(); pendingPause = false;
     if (!ready) return;                                   // 播放器好了再开始
-    if (priming) endPrime();
+    if (priming) { swallowPause = primePaused; endPrime(); }
     if (!live()) P.seekTo(base, true);                    // 从记下的位置开始播放
     P.playVideo();
   };
   function prime() {
-    priming = true; P.mute(); P.seekTo(base, true);       // 未开始时 seekTo 会开始播放
-    primeTimer = setTimeout(endPrime, 5000);              // 被浏览器拦下：保持未开始状态，按播放时照常从 base 开始
+    /* 不设超时：自动播放被浏览器拦下时就一直停在预热状态（静音、未开始），按播放时结束预热、照常从 base 开始；
+       网络慢、很久才开始播也仍然会被静音地暂停住，不会自己出声 */
+    priming = true; primePaused = false; P.mute(); P.seekTo(base, true);       // 未开始时 seekTo 会开始播放
   }
-  function endPrime() { clearTimeout(primeTimer); primeTimer = 0; if (!priming) return; priming = false; if (P) setVolume(vol, muted); }
-  const pause = () => { want = false; if (live()) { flush(); P.pauseVideo(); } };
+  function endPrime() { if (!priming) return; priming = false; primePaused = false; if (P) setVolume(vol, muted); }
+  const pause = () => {
+    want = false; if (!ready || priming) return;
+    if (live()) { flush(); P.pauseVideo(); }
+    else if (state !== ST.ENDED) pendingPause = true;     // 刚按了播放、还没真正开始：开始的那一刻再停
+  };
   /* 拖时间线时会连续跳转：最多每 80ms 发一次，最后一次一定发出 */
   function flush() { clearTimeout(seekTimer); seekTimer = 0; if (seekT == null || !P) return; seekAt = pnow(); P.seekTo(seekT, true); seekT = null; }
   const seek = (t) => {
@@ -73,7 +79,8 @@
     if (!seekTimer) seekTimer = setTimeout(flush, Math.max(0, 80 - (pnow() - seekAt)));
   };
   const setRate = (r) => { rate = r; if (ready) P.setPlaybackRate(r); };
-  const setVolume = (v, m) => { vol = v; muted = !!m; if (!ready) return; P.setVolume(Math.round(v * 100)); if (muted) P.mute(); else P.unMute(); };
+  const setVolume = (v, m) => { vol = v; muted = !!m; if (!ready || priming) return;                 // 预热中保持静音，结束时再套用
+    P.setVolume(Math.round(v * 100)); if (muted) P.mute(); else P.unMute(); };
 
   /* 换成另一个视频（t = 从哪里开始）；c = { ready(), error(why, t), state() }；controls = 显示 YouTube 自己的控制条（设置模式用） */
   let ctl = false, front = false;
@@ -100,11 +107,14 @@
             if (my !== tok) return;
             if (priming) {
               state = e.data;
-              if (state === ST.PLAYING) P.pauseVideo();
+              if (state === ST.PLAYING) { primePaused = true; P.pauseVideo(); }
               else if (state === ST.PAUSED) { endPrime(); P.seekTo(base, true); hold = { t: base, until: pnow() + 1500 }; raw = -1; last = base; if (cb.state) cb.state(state); }
               return;
             }
             const was = live(); state = e.data; raw = -1;
+            if (state === ST.PAUSED && swallowPause) { swallowPause = false; if (want) { P.playVideo(); return; } }
+            if (state === ST.PLAYING) swallowPause = false;
+            if (state === ST.PLAYING && pendingPause) { pendingPause = false; P.pauseVideo(); return; }
             if (state === ST.PLAYING) want = true;
             else if (state === ST.PAUSED) want = false;
             else if (state === ST.ENDED) { want = false; base = dur(); }
@@ -117,7 +127,7 @@
     }).catch((e) => failed(e && e.message));
   };
   function detach() {
-    tok++; clearTimeout(seekTimer); seekTimer = 0; seekT = null; clearTimeout(primeTimer); primeTimer = 0; priming = false;
+    tok++; clearTimeout(seekTimer); seekTimer = 0; seekT = null; priming = primePaused = swallowPause = pendingPause = false;
     if (P) { try { P.destroy(); } catch (e) {} }
     P = null; ready = false; state = -1; want = false; hold = null; id = ''; raw = -1; ctl = false;
     if (box) { box.innerHTML = ''; box.hidden = true; }
@@ -161,13 +171,14 @@
     attach, detach, now, dur, playing, play, pause, seek, setRate, setVolume, layout, title,
     settings, inSettings: () => front, controls: () => ctl,
     id: () => id, ready: () => ready,
-    available: () => !off || hasApi(),
+    /* file:// 打开的页面 YouTube 不让嵌入：不去加载（工程里的链接留着，横幅会提示），免得一打开就报错 */
+    available: () => hasApi() || (!off && location.protocol !== 'file:'),
     init: (el, b) => { box = el; bar = b; if (bar) bar.querySelector('button').onclick = () => settings(false); },
   };
   /* 播放失败的原因 → 提示文字 */
   K.ytWhy = (why) => {
+    if (location.protocol === 'file:' || why === 'file') return T('yt.e.file');
     if (why === 'network') return T('yt.e.net');
-    if (location.protocol === 'file:') return T('yt.e.file');
     if (why === 2) return T('yt.e.bad');
     if (why === 100) return T('yt.e.gone');
     if (why === 101 || why === 150) return T('yt.e.embed');

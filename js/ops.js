@@ -7,7 +7,7 @@
     K.fixLine(l);
   };
   ops.shiftRaw = shiftLine;
-  ops.shift = (l, d) => { shiftLine(l, d); K.commit('shift'); };
+  ops.shift = (l, d) => { if (!isFinite(d)) return; shiftLine(l, d); K.commit('shift'); };
   ops.even = (l) => { K.evenSplit(l); K.commit('even'); };
   ops.add = (t) => {
     const l = K.newLine({ units: K.parseText(K.t('newLyric')), end: t + 2 });

@@ -5,6 +5,8 @@
 #   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 # The MMS_FA alignment model (~1.2 GB) is downloaded automatically on the first run of align.py,
 # and the Demucs htdemucs weights on the first run of separate.py.
+# Last tested with torch / torchaudio 2.11 (cu128) and numpy 1.26. torchaudio has been removing APIs in recent releases:
+# if align.py fails on a newer version with a missing-attribute error, install the versions above.
 torch
 torchaudio
 demucs

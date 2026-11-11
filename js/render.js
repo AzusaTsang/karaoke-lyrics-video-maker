@@ -169,7 +169,7 @@
       if (S.glow > 0) { g.shadowColor = S.glowColor; g.shadowBlur = S.glow; }
       drawPass(g, l, L, false, S, R.a, R.b); g.shadowBlur = 0;
       if (edge > R.off) {
-        g.save(); g.beginPath(); g.rect(R.off - S.size, -S.size * 3, edge - R.off + S.size, S.size * 5); g.clip();
+        g.save(); g.beginPath(); g.rect(R.off - 1e5, -1e5, edge - R.off + 1e5, 2e5); g.clip();          // 只裁右边（擦到哪）：这一趟只画本排的字，上下左不用裁，注音 / 发光再大也不会被切掉
         if (S.glow > 0) { g.shadowColor = S.glowColor; g.shadowBlur = S.glow; }
         drawPass(g, l, L, true, S, R.a, R.b); g.restore();
       }

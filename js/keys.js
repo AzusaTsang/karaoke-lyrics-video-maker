@@ -90,7 +90,8 @@
     const a = document.activeElement, tag = a && a.tagName;
     const typing = a && (tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable || (tag === 'INPUT' && !['range', 'checkbox', 'color', 'button'].includes(a.type)));
     const m = K.matchKey(e);
-    if (typing) { if (m && m.b.typing) { e.preventDefault(); m.b.run(e, m.i); } else if (e.key === 'Escape') a.blur(); return; }
+    /* 正在输入：只有 Ctrl 组合键 / 功能键（F1…）当快捷键；能打出字的键（如 ?）留给输入框 */
+    if (typing) { if (m && m.b.typing && (e.ctrlKey || e.metaKey || e.key.length > 1)) { e.preventDefault(); m.b.run(e, m.i); } else if (e.key === 'Escape') a.blur(); return; }
     if (!m) return;
     /* 聚焦的滑块 / 分隔条自己用方向键等；聚焦的按钮自己用空格 / 回车 */
     if (a && (a.type === 'range' || a.getAttribute('role') === 'separator') && /^(Arrow|Home|End|Page)/.test(e.key)) return;

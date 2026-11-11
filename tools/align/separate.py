@@ -30,6 +30,7 @@ def main():
     ffmpeg = common.need_ffmpeg()
     torch = common.need('torch', 'torch', 'running Demucs')
     sf = common.need('soundfile', 'soundfile', 'reading / writing wav files')
+    torchaudio = common.need('torchaudio', 'torchaudio', 'resampling the vocals to 16 kHz')
     common.need('demucs', 'demucs', 'vocal separation')
     from demucs.apply import apply_model
     from demucs.pretrained import get_model
@@ -60,7 +61,7 @@ def main():
     p44 = os.path.join(args.out_dir, 'vocals_44k.wav')
     p16 = os.path.join(args.out_dir, 'vocals_16k.wav')
     sf.write(p44, v.numpy().T, sr)
-    v16 = torch.nn.functional.interpolate(v.mean(0)[None, None], scale_factor=16000 / sr, mode='linear')[0, 0]
+    v16 = torchaudio.functional.resample(v.mean(0), sr, 16000)     # band-limited (plain interpolation would alias)
     sf.write(p16, v16.numpy(), 16000)
     if not args.keep_mix:
         try:

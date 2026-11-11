@@ -280,9 +280,20 @@ def plan_cue(text, lang='auto'):
         pp = need('pypinyin', 'pypinyin', 'Chinese lines')
         units = [(c, None) for c in text]        # no ruby for Chinese; pinyin is only used for alignment
         groups = []
-        for i, c in enumerate(text):
+        i = 0
+        while i < len(text):
+            c = text[i]
             if is_cjk(c):
                 groups.append(([i], list(re.sub('[^a-z]', '', pp.lazy_pinyin(c)[0].replace('ü', 'u')))))
+                i += 1
+                continue
+            j = i                                 # a run of other characters up to a space / CJK = one word (e.g. English in a Chinese line)
+            while j < len(text) and not text[j].isspace() and not is_cjk(text[j]):
+                j += 1
+            toks = [t for ch in text[i:j] for t in roman(ch)]
+            if toks:
+                groups.append((list(range(i, j)), toks))
+            i = max(j, i + 1)
     else:                                         # French / English / Russian ...: one group per word
         units = []
         groups = []

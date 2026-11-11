@@ -185,7 +185,7 @@ ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt 
 
 ## 隐私
 
-一切都在你的浏览器本地运行。音视频、歌词和工程文件不会上传到任何地方；应用没有后端，**默认不发起任何网络请求**。唯一的例外是「自动注音」：你第一次使用并在对话框里确认后，才会从 jsDelivr（`cdn.jsdelivr.net`）下载 kuromoji 脚本和约 18 MB 的日语词典，之后歌词仍在本机处理、不会上传。因此这个功能需要联网，而且需要能访问 jsDelivr；离线或被屏蔽时会提示失败，歌词不会被改动。
+一切都在你的浏览器本地运行。音视频、歌词和工程文件不会上传到任何地方；应用没有后端，只在两种情况下联网。一是「自动注音」：你第一次使用并在对话框里确认后，才会从 jsDelivr（`cdn.jsdelivr.net`）下载 kuromoji 脚本和约 18 MB 的日语词典，之后歌词仍在本机处理、不会上传。因此这个功能需要联网，而且需要能访问 jsDelivr；离线或被屏蔽时会提示失败，歌词不会被改动。二是 **YouTube**：工程使用 YouTube 视频时，会从 `youtube.com` / `youtube-nocookie.com` 加载 YouTube 播放器，YouTube 会知道你在看这个视频。内置示例就用了 YouTube 视频，所以第一次打开在线版时也会加载；直接从磁盘打开 `index.html`（`file://`）时 YouTube 不允许嵌入，不会加载，没有 YouTube 链接的工程也不会。
 自动保存和界面偏好存放在浏览器的 `localStorage` 中（清除站点数据就没了）。想保留成果请保存 `.kara.json` 文件。
 
 ## 已知限制

@@ -905,6 +905,14 @@ window.addEventListener('load', async () => {
         ok('dotPosForms', !!document.querySelector('#tab-layout select[data-s="dotPos"]') && !!document.querySelector('#tab-line select[data-o="dotPos"]') && document.querySelector('#tab-line select[data-o="dotPos"]').value === 'left');
         K.setOv(l, 'dotPos', null); K.touch(); }
 
+      /* U4c. 擦完的行：最后一个字右边的描边也是已唱色（裁剪边不能停在字的右边界上） */
+      { K.setProject(K.normalizeProject({ settings: { size: 60, strokeW: 12, baseStroke: '#0000ff', highStroke: '#ff0000', baseFill: '#0000ff', highFill: '#ff0000', dots: false, hold: 3, offset: 0 }, lines: [{ start: 1, end: 2, text: 'one' }] })); K.touch();
+        const l = K.project.lines[0], cv = document.createElement('canvas'); cv.width = 1920; cv.height = 1080; const g = cv.getContext('2d', { willReadFrequently: true });
+        const blue = (t) => { K.render(g, t, { bg: 'none' }); const G = K.geo(l, K.screen().info.get(l.id), 1920, 1080), R0 = G.rows[0], x = Math.round(R0.x0 + R0.w) - 2;
+          const d = g.getImageData(x, Math.round(R0.y - 70), 40, 90).data; let c = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128 && d[i + 2] > 128 && d[i] < 128) c++; return c; };
+        out.wipeEnd = { before: blue(0.9), after: blue(2.2) };
+        ok('wipeCoversTrailingStroke', out.wipeEnd.before > 50 && out.wipeEnd.after === 0, out.wipeEnd); }
+
       /* U5. 预备点时长按行：screen 的出现时间 / 预备点时长跟着变；时间线拖动预备点起点、双击恢复自动 */
       { K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.S().offset = 0; K.touch(); const sc1 = K.screen();
         const l = sc1.ord.find((x, i) => { const I = sc1.info.get(x.id); return i > 0 && I.para && I.dotsDur === 3 && x.showAt == null && K.ls(x) - Math.max(...sc1.ord.slice(0, i).map((y) => sc1.info.get(y.id).hide + K.S().fadeOut)) > 5; }), id = l.id, I0 = sc1.info.get(id), s = K.ls(l);

@@ -162,14 +162,17 @@
   /* 一行 = 一排或几排（行内换行）；擦除从一排的末尾接到下一排的开头（展平坐标里连续） */
   function drawLine(g, l, G, t, alpha) {
     const S = K.LS(l), L = G.L; if (!L.total) return;
-    const edge = K.progressEdge(l, L, t);
+    const edge = K.progressEdge(l, L, t), pad = S.strokeW + S.glow + S.size * 0.1;
     G.rows.forEach((R) => {
       g.save(); g.globalAlpha = alpha; g.translate(R.x0, R.y); g.scale(G.s, G.s); if (R.off) g.translate(-R.off, 0);
       g.textBaseline = 'alphabetic'; g.textAlign = 'left';
       if (S.glow > 0) { g.shadowColor = S.glowColor; g.shadowBlur = S.glow; }
       drawPass(g, l, L, false, S, R.a, R.b); g.shadowBlur = 0;
       if (edge > R.off) {
-        g.save(); g.beginPath(); g.rect(R.off - 1e5, -1e5, edge - R.off + 1e5, 2e5); g.clip();          // 只裁右边（擦到哪）：这一趟只画本排的字，上下左不用裁，注音 / 发光再大也不会被切掉
+        /* 描边 / 发光伸到最后一个字的右边界外面：擦到本排最后一个字时，裁剪边逐渐多走出这一段，擦完时连描边一起盖住（否则右端留一条没擦到的边） */
+        let ce = edge, j = R.b - 1; while (j >= R.a && !L.units[j].w) j--;
+        if (j >= R.a && edge > L.units[j].x) ce = edge + pad * Math.min(1, (edge - L.units[j].x) / L.units[j].w);
+        g.save(); g.beginPath(); g.rect(R.off - 1e5, -1e5, ce - R.off + 1e5, 2e5); g.clip();          // 只裁右边（擦到哪）：这一趟只画本排的字，上下左不用裁，注音 / 发光再大也不会被切掉
         if (S.glow > 0) { g.shadowColor = S.glowColor; g.shadowBlur = S.glow; }
         drawPass(g, l, L, true, S, R.a, R.b); g.restore();
       }

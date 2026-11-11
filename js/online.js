@@ -23,6 +23,13 @@
     'on.adLead': 'Thanks for using this tool! Revenue from the ad below helps keep it maintained.',
     'on.adNone': 'Ad not showing? It may be blocked by an ad blocker, or no ad is available right now. The tool works the same either way.',
   });
+  /* 在线版用了 Google Analytics 和 AdSense：在「关于」的隐私说明后面如实补一句 */
+  const PRIV = {
+    'zh-CN': ' 在线版另外使用 Google Analytics 统计访问量，并通过 Google AdSense 展示广告：这两项会向 Google 发送请求，可能使用 Cookie；你的音视频、歌词和工程仍然不会上传。',
+    ja: ' オンライン版ではこのほかに、アクセス解析に Google Analytics を、広告の表示に Google AdSense を使っています。どちらも Google に通信し、Cookie を使うことがあります。音声・動画、歌詞、プロジェクトがアップロードされないことは変わりません。',
+    en: ' The online version also uses Google Analytics to count visits and Google AdSense to show ads: both send requests to Google and may use cookies. Your media, lyrics and projects are still never uploaded.',
+  };
+  Object.keys(PRIV).forEach((l) => { K.I18N[l]['about.privacy'] += PRIV[l]; });
   K.applyI18n();
 
   // AdSense 要求 <ins> 在 push 时已有宽度，所以对话框打开（showModal）后才 push；切换语言重画后再 push 一次

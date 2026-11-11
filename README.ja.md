@@ -1,4 +1,4 @@
-# カラオケ歌詞スタジオ
+# カラオケ歌詞動画メーカー
 
 [English](README.md) · [简体中文](README.zh-CN.md) · **日本語**
 
@@ -8,7 +8,7 @@ Premiere Pro などにそのまま読み込める**透明 PNG 連番**の書き�
 
 インストールもビルドも不要です。Chrome / Edge で `index.html` を開くか、フォルダごと静的サーバーに置くだけで使えます。
 
-![カラオケ歌詞スタジオ](assets/social-preview.svg)
+![カラオケ歌詞動画メーカー](assets/social-preview.svg)
 
 **オンラインで試す：** `https://<your-github-username>.github.io/karaoke-studio/`
 （これはプレースホルダーです。ご自身の GitHub Pages の URL に置き換えてください。手順は[GitHub Pages への公開](#github-pages-への公開)を参照）

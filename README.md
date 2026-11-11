@@ -1,4 +1,4 @@
-# Karaoke Lyrics Studio
+# Karaoke Lyrics Video Maker
 
 **English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
@@ -8,7 +8,7 @@ Export a **transparent PNG sequence** that Premiere Pro and other editors import
 
 No installation and no build step: open `index.html` in Chrome or Edge, or host the folder on any static server.
 
-![Karaoke Lyrics Studio](assets/social-preview.svg)
+![Karaoke Lyrics Video Maker](assets/social-preview.svg)
 
 **Try it online:** `https://<your-github-username>.github.io/karaoke-studio/`
 (this is a placeholder - replace it with the URL of your own GitHub Pages deployment, see [Deploying to GitHub Pages](#deploying-to-github-pages))

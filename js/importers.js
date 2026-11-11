@@ -146,7 +146,7 @@
   K.exportLrcText = (words) => {
     const off = K.S().offset, head = []; const ti = (K.project.title || '').replace(/[\r\n\]]/g, ' ').trim();
     if (ti) head.push('[ti:' + ti + ']');
-    head.push('[re:Karaoke Lyrics Studio]', '[ve:' + K.APP.version + ']');
+    head.push('[re:Karaoke Lyrics Video Maker]', '[ve:' + K.APP.version + ']');
     /* LRC 没有“一行里换行”：行内换行变成一个空格（旁边已经有空白时不加），在增强 LRC 里这个空格跟着换行前的那一组 */
     const ut = (l, i) => { const nx = l.units[i + 1]; return l.units[i].t + (nx && nx.n && !/\s$/.test(l.units[i].t) && !/^\s/.test(nx.t) ? ' ' : ''); };
     const body = byStart().filter((l) => plain(l).trim()).map((l) => '[' + lrcT(K.ls(l) + off) + ']' +

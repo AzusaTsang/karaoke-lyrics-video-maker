@@ -1,4 +1,4 @@
-# Forced-alignment tools for Karaoke Lyrics Studio (Python 3.9+)
+# Forced-alignment tools for Karaoke Lyrics Video Maker (Python 3.9+)
 #
 # torch / torchaudio: a CUDA build is strongly recommended (CPU works but is much slower).
 #   Pick the right command on https://pytorch.org/get-started/locally/ BEFORE installing the rest, e.g.

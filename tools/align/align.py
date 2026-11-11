@@ -3,7 +3,7 @@
 
 Input : an .srt file (one cue per lyric line) and vocals_16k.wav from separate.py
 Output: a JSON array  [{id, start, end, text, score, units:[{t, r, t0, t1}]}]
-        that the Karaoke Lyrics Studio can import directly ("Import SRT / JSON...").
+        that the Karaoke Lyrics Video Maker can import directly ("Import SRT / JSON...").
 
 Modes
   window  each cue is aligned independently inside its SRT time +/- --pad seconds (robust, default)

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
-  <title>Karaoke Lyrics Studio</title>
+  <title>Karaoke Lyrics Video Maker</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#1b1b2b"/>
@@ -28,8 +28,8 @@
 
   <!-- names -->
   <g font-family="'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans CJK SC', 'Noto Sans CJK JP', 'Microsoft YaHei', 'Yu Gothic', 'Hiragino Sans', sans-serif">
-    <text x="284" y="124" font-size="64" font-weight="700" fill="#ffffff">Karaoke Lyrics Studio</text>
-    <text x="286" y="176" font-size="34" fill="#c9c9dc">卡拉OK歌词工作室  ·  カラオケ歌詞スタジオ</text>
+    <text x="284" y="124" font-size="64" font-weight="700" fill="#ffffff">Karaoke Lyrics Video Maker</text>
+    <text x="286" y="176" font-size="34" fill="#c9c9dc">卡拉OK歌词视频制作器  ·  カラオケ歌詞動画メーカー</text>
   </g>
 
   <!-- lyric wipe demo: shapes only -->

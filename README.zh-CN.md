@@ -1,4 +1,4 @@
-# 卡拉OK歌词工作室
+# 卡拉OK歌词视频制作器
 
 [English](README.md) · **简体中文** · [日本語](README.ja.md)
 
@@ -7,7 +7,7 @@
 
 无需安装和构建：用 Chrome / Edge 直接打开 `index.html`，或把整个文件夹放到任意静态服务器上。
 
-![卡拉OK歌词工作室](assets/social-preview.svg)
+![卡拉OK歌词视频制作器](assets/social-preview.svg)
 
 **在线试用：** `https://<your-github-username>.github.io/karaoke-studio/`
 （这只是占位地址，请换成你自己部署后的 GitHub Pages 地址，见[部署到 GitHub Pages](#部署到-github-pages)）

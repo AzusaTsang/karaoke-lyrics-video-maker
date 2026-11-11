@@ -4,7 +4,7 @@ Nothing in this module imports torch at import time, so the pure-Python parts
 (SRT parsing, splitting a lyric line into display units + readings, building the
 alignment tokens) can be used and tested without a GPU stack.
 
-Output unit format (what the Karaoke Lyrics Studio imports):
+Output unit format (what the Karaoke Lyrics Video Maker imports):
     {"t": "字", "r": "じ" | null, "t0": 1.234, "t1": 1.456}
 """
 import importlib

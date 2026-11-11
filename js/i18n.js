@@ -6,7 +6,7 @@
   const D = {};
 
   D['zh-CN'] = {
-    'app.name': '卡拉OK歌词工作室',
+    'app.name': '卡拉OK歌词视频制作器',
     'untitled': '未命名',
     'newLyric': '新歌词',
     'projType': '卡拉OK工程',
@@ -121,7 +121,7 @@
     'tip.charMora': '「{c}」第 {n} 拍「{m}」', 'tip.retime': '{what} 开始于 {t} 秒', 'tip.lineEnd': '行结束于 {t} 秒',
     'tip.pushed': '同时推动了另外 {n} 个边界（橙色）', 'tip.move': '开始 {t} 秒 · 第 {row} 行', 'tip.tick': '{what} → {t} 秒',
     'tip.end': '结束 {t} 秒', 'tip.show': '出现 {t} 秒', 'tip.hide': '消失 {t} 秒',
-    'tip.auto': '自动（可拖动修改）', 'tip.snapped': '已吸附到播放头 · 按住 Shift 不吸附', 'w.title': '欢迎使用卡拉OK歌词工作室',
+    'tip.auto': '自动（可拖动修改）', 'tip.snapped': '已吸附到播放头 · 按住 Shift 不吸附', 'w.title': '欢迎使用卡拉OK歌词视频制作器',
     'w.pitch': '在浏览器里制作逐字擦除的卡拉OK歌词：支持注音、多行排版和预备点，可导出带透明通道的 PNG 序列。所有内容都只在本机处理，不会上传。', 'w.step1': '载入歌曲', 'w.step1Desc': '把音频或视频拖进窗口，或点「载入音视频…」。',
     'w.step2': '放入歌词', 'w.step2Desc': '粘贴歌词，或导入 SRT / LRC 字幕、逐字对齐的 JSON，也可以在时间线上右键添加。', 'w.step3': '校时',
     'w.step3Desc': "播放时按 T 逐字（字母按音节）打点，或在预览里拖动擦除光标、在时间线上拖动刻度。", 'w.step4': '导出', 'w.step4Desc': '导出透明 PNG 序列放进剪辑软件，或使用录屏模式。',
@@ -235,7 +235,7 @@
   };
 
   D.ja = {
-    'app.name': 'カラオケ歌詞スタジオ',
+    'app.name': 'カラオケ歌詞動画メーカー',
     'untitled': '無題',
     'newLyric': '新しい歌詞',
     'projType': 'カラオケプロジェクト',
@@ -350,7 +350,7 @@
     'tip.charMora': '「{c}」の {n} 拍目「{m}」', 'tip.retime': '{what} の開始 = {t} 秒', 'tip.lineEnd': '行の終了 = {t} 秒',
     'tip.pushed': 'ほかの境界 {n} か所も押し出されます（オレンジ）', 'tip.move': '開始 {t} 秒 · {row} 段目', 'tip.tick': '{what} → {t} 秒',
     'tip.end': '終了 {t} 秒', 'tip.show': '表示開始 {t} 秒', 'tip.hide': '表示終了 {t} 秒',
-    'tip.auto': '自動（ドラッグで変更）', 'tip.snapped': '再生位置にスナップ中 · Shift を押すと解除', 'w.title': 'カラオケ歌詞スタジオへようこそ',
+    'tip.auto': '自動（ドラッグで変更）', 'tip.snapped': '再生位置にスナップ中 · Shift を押すと解除', 'w.title': 'カラオケ歌詞動画メーカーへようこそ',
     'w.pitch': 'ブラウザーだけで、一文字ずつワイプするカラオケ歌詞を作れます。ルビ、複数段レイアウト、カウントインに対応し、透明 PNG 連番で書き出せます。データはこの PC の中だけで処理され、アップロードされません。', 'w.step1': '曲を読み込む', 'w.step1Desc': '音声・動画をウィンドウにドロップするか、「音声・動画…」から読み込みます。',
     'w.step2': '歌詞を入れる', 'w.step2Desc': '歌詞を貼り付けるか、SRT・LRC 字幕や一文字ごとの JSON を読み込みます。タイムラインを右クリックして追加することもできます。', 'w.step3': 'タイミングを合わせる',
     'w.step3Desc': '再生しながら T キーでタップするか、プレビューのワイプカーソルやタイムラインの目盛りをドラッグします。', 'w.step4': '書き出す', 'w.step4Desc': '透明 PNG 連番を書き出して動画編集ソフトへ。録画モードも使えます。',
@@ -464,7 +464,7 @@
   };
 
   D.en = {
-    'app.name': 'Karaoke Lyrics Studio',
+    'app.name': 'Karaoke Lyrics Video Maker',
     'untitled': 'Untitled',
     'newLyric': 'New lyric',
     'projType': 'Karaoke project',
@@ -579,7 +579,7 @@
     'tip.charMora': '“{c}” mora {n} “{m}”', 'tip.retime': '{what} starts at {t} s', 'tip.lineEnd': 'Line ends at {t} s',
     'tip.pushed': 'Also pushes {n} other boundaries (orange)', 'tip.move': 'Start {t} s · Row {row}', 'tip.tick': '{what} → {t} s',
     'tip.end': 'End {t} s', 'tip.show': 'Appears {t} s', 'tip.hide': 'Disappears {t} s',
-    'tip.auto': 'auto (drag to change)', 'tip.snapped': 'Snapped to playhead · hold Shift to release', 'w.title': 'Welcome to Karaoke Lyrics Studio',
+    'tip.auto': 'auto (drag to change)', 'tip.snapped': 'Snapped to playhead · hold Shift to release', 'w.title': 'Welcome to Karaoke Lyrics Video Maker',
     'w.pitch': 'Make character-by-character karaoke lyrics in your browser, with furigana, multi-row layouts and count-in dots, and export them as a transparent PNG sequence. Everything stays on your computer.', 'w.step1': 'Load your song', 'w.step1Desc': 'Drop an audio or video file onto the window, or use “Load Media…”.',
     'w.step2': 'Get the lyrics in', 'w.step2Desc': 'Paste lyrics, or import SRT / LRC subtitles or a per-character JSON. You can also right-click the timeline to add lines.', 'w.step3': 'Retime',
     'w.step3Desc': 'Tap T while it plays, or drag the wipe cursor in the preview and the ticks on the timeline.', 'w.step4': 'Export', 'w.step4Desc': 'Write a transparent PNG sequence for your video editor, or use Record Mode.',

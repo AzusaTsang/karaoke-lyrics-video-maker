@@ -185,6 +185,7 @@
       R('paraGap', 'f.paraGap', 1, 15, 0.5),
       { k: 'dots', label: 'f.dots', type: 'check', hint: 'f.dotsHint' },
       R('dotsDur', 'f.dotsDur', 1.5, 6, 0.5), R('dotSize', 'f.dotSize', 0.15, 0.7, 0.01),
+      { k: 'dotPos', label: 'f.dotPos', type: 'select', opts: [['top', 'f.dotTop'], ['left', 'f.dotLeft']] },
       { label: 'f.dotColors', type: 'colors', ks: ['dotFill', 'dotHighFill'], opt: 1 },
       ['f.sync'],
       R('offset', 'f.offset', -2, 2, 0.01),
@@ -225,7 +226,7 @@
     ['line.gTextS'], 'FONT', ...['font', 'weight', 'size', 'spacing', 'maxW', 'wrapGap', 'strokeW', 'glowColor', 'glow'].map(fdesc),
     ['line.gColors'], fdesc('baseFill'), fdesc('baseStroke'),
     ['line.gRuby'], ...['rubyRatio', 'rubyGap', 'rubyFill', 'rubyStroke', 'rubyStrokeW'].map(fdesc),
-    ['line.gDots'], ...['dotsDur', 'dotSize', 'dotFill'].map(fdesc),
+    ['line.gDots'], ...['dotsDur', 'dotSize', 'dotPos', 'dotFill'].map(fdesc),
   ];
   function lineStyleHtml(l, I) {
     const E = K.LS(l), o = l.o || {}, n = Object.keys(o).length, rs = et('line.ovFieldReset');

@@ -9,7 +9,7 @@
     rubyFill: '#ffffff', rubyStroke: '#1b3a8a', rubyHighFill: '#ffd84d', rubyHighStroke: '#a14a00',
     strokeW: 8, rubyStrokeW: 4, glow: 0, glowColor: '#4aa3ff',
     W: 1920, H: 1080, posY: 0.7, maxW: 0.92, layout: 'duet', marginX: 0.06, rows: 2, preShow: 6,
-    dots: true, paraGap: 4, dotsDur: 3, dotSize: 0.36, dotFill: '', dotHighFill: '', wrapGap: 0.3,
+    dots: true, paraGap: 4, dotsDur: 3, dotSize: 0.36, dotFill: '', dotHighFill: '', dotPos: 'top', wrapGap: 0.3,
     lead: 0.6, hold: 0.5, fadeIn: 0.2, fadeOut: 0.25, offset: 0,
     bgMode: 'transparent', bgColor: '#101820', keyColor: '#00ff00', useVideoBg: false, fps: 60,
   };
@@ -21,7 +21,7 @@
     marginX: [0, 0.5], preShow: [0, 60], paraGap: [0, 120], dotsDur: [0, 30], dotSize: [0.01, 3], wrapGap: [-0.5, 5],
     lead: [0, 30], hold: [0, 30], fadeIn: [0, 10], fadeOut: [0, 10], offset: [-60, 60],
   };
-  K.ENUM = { weight: ['normal', 'bold', '900'], layout: ['duet', 'stack'], bgMode: ['transparent', 'color'], rows: [1, 2, 3], fps: [24, 25, 30, 50, 60] };
+  K.ENUM = { weight: ['normal', 'bold', '900'], layout: ['duet', 'stack'], bgMode: ['transparent', 'color'], dotPos: ['top', 'left'], rows: [1, 2, 3], fps: [24, 25, 30, 50, 60] };
   const COLOR_RE = /^#[0-9a-f]{6}$/i;
   /* 可以留空的颜色（'' = 跟随歌词颜色）：预备点的未唱 / 正在倒数颜色 */
   const OPT_COLOR = new Set(['dotFill', 'dotHighFill']);
@@ -51,7 +51,7 @@
      LSTYLE：可以按行覆盖的全局设置（字体 / 字号 / 颜色 / 描边 / 注音 / 最大宽度 / 行内换行间距 / 预备点）；
      LPOS：只属于行的位置属性：dx / dy = 位置偏移（画布宽 / 高的比例，换画布尺寸也不走样），grow = 换行后的多行往哪边长 */
   K.LSTYLE = ['font', 'weight', 'size', 'spacing', 'maxW', 'wrapGap', 'strokeW', 'glow', 'glowColor', 'baseFill', 'highFill', 'baseStroke', 'highStroke',
-    'rubyRatio', 'rubyGap', 'rubyFill', 'rubyHighFill', 'rubyStroke', 'rubyHighStroke', 'rubyStrokeW', 'dotsDur', 'dotSize', 'dotFill', 'dotHighFill'];
+    'rubyRatio', 'rubyGap', 'rubyFill', 'rubyHighFill', 'rubyStroke', 'rubyHighStroke', 'rubyStrokeW', 'dotsDur', 'dotSize', 'dotFill', 'dotHighFill', 'dotPos'];
   K.LPOS = ['dx', 'dy', 'grow'];
   K.LKEYS = K.LSTYLE.concat(K.LPOS);
   K.LDEF = { dx: 0, dy: 0, grow: 'auto' };

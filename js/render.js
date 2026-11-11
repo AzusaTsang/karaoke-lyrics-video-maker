@@ -176,15 +176,17 @@
       g.restore();
     });
   }
-  /* 预备点：放在第一排前面；颜色可单独设置（留空 = 跟随歌词填充色） */
+  /* 预备点：放在第一排前面——dotPos = top 在行首上方，left 在行首左边（和文字同高，最后一个点紧挨着第一个字）；颜色可单独设置（留空 = 跟随歌词填充色） */
   function drawDots(g, l, I, G, t, alpha) {
     const S = K.LS(l), s0 = K.ls(l), dur = I.dotsDur; if (!dur || t >= s0) return;
     const el = t - (s0 - dur), R = (S.size * S.dotSize) / 2, gap = R * 0.8, unit = dur / 3, R0 = G.rows[0];
-    const y = R0.y - G.top * G.s - R * 1.6;
+    const left = S.dotPos === 'left', step = 2 * R + gap;
+    const y = left ? R0.y - S.size * 0.36 * G.s : R0.y - G.top * G.s - R * 1.6;
+    const xa = left ? R0.x0 - S.strokeW * G.s - R * 1.4 - 2 * step - R : R0.x0 + R;
     g.save(); g.globalAlpha = alpha;
     for (let i = 0; i < 3; i++) {
       const p = (el - i * unit) / unit, m = p <= 0 ? 1 : p >= 1 ? 0 : 1 - p; if (m <= 0) continue;
-      const cx = R0.x0 + R + i * (2 * R + gap), on = p > 0;
+      const cx = xa + i * step, on = p > 0;
       g.beginPath(); g.arc(cx, y, R * m, 0, Math.PI * 2);
       g.lineWidth = S.strokeW * 0.7 * m * 2; g.strokeStyle = on ? S.highStroke : S.baseStroke; if (g.lineWidth > 0) g.stroke();
       g.fillStyle = on ? S.dotHighFill || S.highFill : S.dotFill || S.baseFill; g.fill();

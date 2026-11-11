@@ -26,7 +26,7 @@ window.addEventListener('load', async () => {
       wd.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await frames(1);
       ok('welcomeEscCloses', !document.querySelector('dialog.welcome') && !K.modalOpen() && K.pref('welcomed') === true);
       // 第二次打开（同一浏览器，有 welcomed 标记、无自动保存）：用 iframe 真正再启动一次
-      const boot = async () => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-3000px;width:1200px;height:800px'; f.src = 'index.html';
+      const boot = async () => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-3000px;width:1200px;height:800px'; f.src = 'index.html?noyt';
         const ld = new Promise((r) => (f.onload = r)); document.body.appendChild(f); await ld; await wait(50);
         let r = null; try { const w = f.contentWindow; r = { welcome: !!w.document.querySelector('dialog.welcome'), boot: !!(w.K && w.K.project) }; } catch (e) { r = { err: String(e) }; }
         f.remove(); return r; };
@@ -1117,6 +1117,140 @@ window.addEventListener('load', async () => {
       window.dispatchEvent(new DragEvent('drop', { dataTransfer: dB, bubbles: true, cancelable: true }));
       await until(() => seen.length >= 4); un2();
       ok('dropsSerialised', seen.join() === 'Q1,Q2,Q3,Q4', seen); }
+
+    // ---- I. YouTube：链接解析、工程字段、用假的 YT.Player 驱动播放时钟、内置示例 ----
+    { const ID = '4pzuHoWYn0Q', yb = document.getElementById('ytBox');
+      const cases = [[ID, ID], ['https://www.youtube.com/watch?v=' + ID + '&t=10s', ID], ['https://youtu.be/' + ID + '?si=abc', ID], ['youtube.com/shorts/' + ID, ID],
+        ['https://m.youtube.com/watch?v=' + ID, ID], ['https://music.youtube.com/watch?v=' + ID + '&list=x', ID], ['https://www.youtube-nocookie.com/embed/' + ID, ID], ['  https://www.youtube.com/live/' + ID + '  ', ID],
+        ['https://example.com/watch?v=' + ID, ''], ['https://www.youtube.com/watch?v=short', ''], ['hello', ''], ['', ''], [null, ''], ['javascript:alert(1)', '']];
+      out.ytIds = cases.map(([s, e]) => [s, K.ytId(s), e]).filter((c) => c[1] !== c[2]);
+      ok('ytIdParse', !out.ytIds.length, out.ytIds);
+      ok('ytProjectField', K.normalizeProject({ youtube: 'https://youtu.be/' + ID, lines: [] }).youtube === ID && K.normalizeProject({ youtube: '<b>x</b>', lines: [] }).youtube === '' && K.blank().youtube === '');
+      ok('ytOffWithoutApi', K.yt.available() === false && K.mediaMode() !== 'yt');      // ?noyt 且没有 window.YT：不联网
+
+      /* 假播放器：行为照 IFrame API（状态变化事件是异步的；未开始时 seekTo 会开始播放） */
+      const calls = [];
+      function FakePlayer(el, o) {
+        const self = this; let st = -1, t0 = 0, at = performance.now(), rate = 1, vol = 100, mut = false;
+        const cur = () => (st === 1 ? t0 + ((performance.now() - at) / 1000) * rate : t0);
+        const set = (s) => { t0 = cur(); at = performance.now(); st = s; setTimeout(() => o.events.onStateChange({ data: s, target: self })); };
+        const ifr = document.createElement('iframe'); el.replaceWith(ifr);
+        Object.assign(this, {
+          getCurrentTime: () => cur(), getDuration: () => 200, getPlayerState: () => st, getVideoData: () => ({ title: 'Fake ' + o.videoId }),
+          playVideo: () => { calls.push('play'); if (st !== 1) set(1); }, pauseVideo: () => { calls.push('pause'); set(2); },
+          seekTo: (t) => { calls.push('seek:' + t.toFixed(2)); t0 = t; at = performance.now(); if (st !== 1 && st !== 2) set(1); },
+          setPlaybackRate: (r) => { t0 = cur(); at = performance.now(); rate = r; }, setVolume: (v) => { vol = v; }, mute: () => { mut = true; }, unMute: () => { mut = false; },
+          destroy: () => { calls.push('destroy'); ifr.remove(); }, _s: () => ({ vol, mut, rate, st, videoId: o.videoId, host: o.host }),
+        });
+        FakePlayer.last = this; FakePlayer.opts = o; FakePlayer.n = (FakePlayer.n || 0) + 1;
+        setTimeout(() => o.events.onReady({ target: self }), 10);
+      }
+      window.YT = { Player: FakePlayer };
+      const ytReady = () => until(() => K.mediaMode() === 'yt' && K.yt.ready(), 60);
+
+      // 从本地文件（H 里载入的 tone.wav）换成 YouTube
+      const was = K.mediaMode(); K.dirty = false;
+      K.setYouTube(ID); await ytReady();
+      const fp = () => FakePlayer.last._s();
+      out.yt = { was, mode: K.mediaMode(), proj: K.project.youtube, why: K.undoWhy(), host: fp().host, vid: fp().videoId, box: !yb.hidden && !!yb.querySelector('iframe'),
+        src: document.getElementById('media').getAttribute('src'), label: document.getElementById('mediaName').textContent, dur: K.dur() };
+      ok('ytAttach', was === 'file' && out.yt.mode === 'yt' && out.yt.proj === ID && out.yt.vid === ID && K.dirty && out.yt.why === 'media', out.yt);
+      ok('ytNoCookieHost', /youtube-nocookie\.com$/.test(out.yt.host), out.yt.host);
+      ok('ytReplacesFile', out.yt.box && !out.yt.src && !K.peaks, out.yt);
+      ok('ytLabelAndDur', out.yt.label === 'YouTube · Fake ' + ID && out.yt.dur === 200, out.yt);
+      await frames(2);
+      ok('ytUiState', document.getElementById('clock').hidden && document.getElementById('mbanner').hidden && !document.getElementById('vol').disabled);
+      // 还没开始播放：跳转只记下来（真播放器这时 seekTo 会自动开始播放）
+      // 载入后预热：静音播一下马上暂停在原来的时间，音量恢复，按钮仍是暂停
+      ok('ytPrimed', fp().st === 2 && !fp().mut && !K.playing() && near(K.now(), out.yt.t0 || K.now(), 0.01), fp());
+      calls.length = 0; K.seek(30); await wait(150);
+      ok('ytSeekWhilePaused', near(K.now(), 30) && calls.join() === 'seek:30.00' && !K.playing() && fp().st === 2, { now: K.now(), calls });
+      K.play(); await wait(30);
+      ok('ytPlayFromSeek', calls.includes('play') && K.playing() && K.now() >= 30 && K.now() < 30.3, { calls, now: K.now() });
+      await wait(400); const tp = K.now();
+      ok('ytClockAdvances', tp > 30.2 && tp < 31.5, tp);
+      { const ts = []; for (let i = 0; i < 12; i++) { await frames(1); ts.push(K.now()); }
+        ok('ytMonotonic', ts.every((x, i) => !i || x >= ts[i - 1]), ts); }
+      // 播放中跳转：立刻反映；连续拖动时节流（最后一次一定发出）
+      calls.length = 0; K.seek(50); ok('ytSeekImmediate', near(K.now(), 50, 0.05), K.now());
+      for (let i = 1; i <= 20; i++) K.seek(60 + i / 20);
+      await wait(250);
+      const sk = calls.filter((c) => c.startsWith('seek:'));
+      ok('ytSeekThrottled', sk.length <= 3 && sk[sk.length - 1] === 'seek:61.00' && K.now() >= 61 && K.now() < 62, { sk, now: K.now() });
+      K.setSpeed(0.75); ok('ytRate', fp().rate === 0.75, fp()); K.setSpeed(1);
+      K.setVolume(0.4, true); ok('ytVolume', fp().vol === 40 && fp().mut === true, fp()); K.setVolume(1, false); ok('ytUnmute', fp().vol === 100 && !fp().mut);
+      K.pause(); await wait(60); const pz = K.now(); await wait(200);
+      ok('ytPause', !K.playing() && calls.includes('pause') && near(K.now(), pz, 1e-6), { pz, now: K.now() });
+      // 播放器盖住画布；视频背景开 = 原样，关 = 调暗；开视频背景时画布不画抠像底色（录屏模式也透明）
+      const cvv = document.getElementById('cv'); K.S().useVideoBg = true; K.invalidate(); await frames(2);
+      ok('ytBoxCoversCanvas', yb.offsetWidth === cvv.offsetWidth && yb.offsetHeight === cvv.offsetHeight && yb.offsetLeft === cvv.offsetLeft && !yb.classList.contains('dim'), [yb.offsetWidth, cvv.offsetWidth, yb.offsetLeft, cvv.offsetLeft]);
+      document.body.classList.add('rec'); K.invalidate(); await frames(2);
+      { const px = cvv.getContext('2d').getImageData(2, 2, 1, 1).data; ok('ytRecTransparent', px[3] === 0, [...px]); }
+      document.body.classList.remove('rec');
+      K.S().useVideoBg = false; await frames(2); ok('ytDimWithoutVideoBg', yb.classList.contains('dim'));
+      // 播放器设置模式：换成带控制条的播放器、放到歌词上面；完成 / Esc 换回来；时间不变
+      { const bs = document.getElementById('bYtSet'), bar = document.getElementById('ytBar'), n0 = FakePlayer.n;
+        ok('ytSetButtonShown', !bs.hidden);
+        bs.click(); await ytReady();
+        out.ytSet = { ctl: FakePlayer.opts.playerVars.controls, kb: FakePlayer.opts.playerVars.disablekb, front: yb.classList.contains('front'), bar: !bar.hidden, n: FakePlayer.n - n0, now: K.now(), z: getComputedStyle(yb).zIndex, pe: getComputedStyle(yb).pointerEvents };
+        ok('ytSettingsOpen', out.ytSet.ctl === 1 && out.ytSet.kb === 0 && out.ytSet.front && out.ytSet.bar && out.ytSet.n === 1 && out.ytSet.pe === 'auto' && +out.ytSet.z > 1 && near(K.now(), pz, 0.01) && K.yt.inSettings(), out.ytSet);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); await ytReady();
+        ok('ytSettingsEsc', !K.yt.inSettings() && FakePlayer.opts.playerVars.controls === 0 && !yb.classList.contains('front') && bar.hidden && near(K.now(), pz, 0.01));
+        K.yt.settings(true); await ytReady(); bar.querySelector('button').click(); await ytReady();
+        ok('ytSettingsDone', !K.yt.inSettings() && FakePlayer.opts.playerVars.controls === 0 && FakePlayer.n === n0 + 4, FakePlayer.n - n0);
+        K.yt.settings(true); await ytReady(); K.play(); await wait(200);
+        ok('ytSettingsKeepsPlaying', K.playing() && K.now() > pz + 0.1, K.now());
+        K.yt.settings(false); await ytReady(); await wait(100);
+        ok('ytSettingsCloseKeepsPlaying', K.playing() && !K.yt.inSettings(), K.playing());
+        K.pause(); K.seek(pz); await wait(100); }
+      // 撤销 / 重做跟着切换播放器
+      const n0 = FakePlayer.n; K.undo(); await frames(2);
+      ok('ytUndoDetaches', K.project.youtube === '' && K.mediaMode() === '' && yb.hidden && calls.includes('destroy') && near(K.now(), pz, 0.01), { mode: K.mediaMode(), now: K.now() });
+      K.redo(); await ytReady(); ok('ytRedoAttaches', K.mediaMode() === 'yt' && FakePlayer.n === n0 + 1 && near(K.now(), pz, 0.01), { n: FakePlayer.n, now: K.now() });
+      // 新建 / 导入沿用正在用的视频
+      K.dirty = false; await K.newProject(); await frames(2);
+      ok('ytKeptOnNew', K.project.youtube === ID && K.mediaMode() === 'yt' && FakePlayer.n === n0 + 1, { y: K.project.youtube, n: FakePlayer.n });
+      // 播放器报错：退回无声时钟，提示原因；之后的撤销等不再自动重试
+      FakePlayer.opts.events.onError({ data: 150 }); await frames(2);
+      const tl = [...document.querySelectorAll('#toasts .toast')].map((x) => x.dataset.msg).join('|');
+      ok('ytErrorFallsBack', K.mediaMode() === '' && yb.hidden && tl.includes(K.t('yt.e.file')) && !document.getElementById('clock').hidden, { mode: K.mediaMode(), tl });
+      ok('ytErrorBanner', !document.getElementById('mbanner').hidden && document.querySelector('#mbanner .tx').textContent === K.t('mb.yt'));
+      const n1 = FakePlayer.n; K.emit('load'); await frames(2); ok('ytNoAutoRetry', FakePlayer.n === n1 && K.mediaMode() === '');
+      // 载入本地文件优先，工程里的链接保留
+      K.setYouTube(ID); await ytReady();
+      const wav = new File([new Uint8Array([82, 73, 70, 70])], 'x.wav', { type: 'audio/wav' });
+      K.loadMedia(wav);
+      ok('ytFileWins', K.mediaMode() === 'file' && yb.hidden && K.project.youtube === ID, { mode: K.mediaMode(), y: K.project.youtube });
+      // 这个文件放不了：退回工程里的 YouTube 视频
+      ok('ytAfterFileError', await until(() => K.mediaMode() === 'yt' && K.yt.ready(), 80), K.mediaMode());
+      // 拖入 YouTube 链接
+      { const dt = new DataTransfer(); dt.setData('text/uri-list', 'https://youtu.be/dQw4w9WgXcQ');
+        window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+        await until(() => K.yt.ready() && fp().videoId === 'dQw4w9WgXcQ');
+        ok('ytDropLink', K.project.youtube === 'dQw4w9WgXcQ' && fp().videoId === 'dQw4w9WgXcQ', K.project.youtube); }
+      // 对话框：无效链接时「使用」不可点；有效链接 → 换视频；「移除链接」
+      { const p = K.youtubeDialog(); await frames(1);
+        const d = document.querySelector('dialog.yt'), i = d && d.querySelector('#ytUrl'), go = d && d.querySelector('.dacts .pri');
+        ok('ytDialogPrefill', i && i.value === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' && !go.disabled && !!d.querySelector('.dacts .danger'), i && i.value);
+        i.value = 'not a link'; i.dispatchEvent(new Event('input', { bubbles: true }));
+        ok('ytDialogInvalid', go.disabled && d.querySelector('#ytMsg').textContent === K.t('yt.bad'));
+        i.value = 'https://www.youtube.com/watch?v=' + ID; i.dispatchEvent(new Event('input', { bubbles: true })); go.click(); await p; await ytReady();
+        ok('ytDialogUse', K.project.youtube === ID && fp().videoId === ID && !document.querySelector('dialog.yt'));
+        const p2 = K.youtubeDialog(); await frames(1); document.querySelector('dialog.yt .dacts .danger').click(); await p2; await frames(1);
+        ok('ytDialogRemove', K.project.youtube === '' && K.mediaMode() === '' && yb.hidden); }
+
+      // 内置示例（发布的 samples/，不是测试用的固定数据）：数据完整、带 YouTube 链接，载入后自动用这个视频
+      const saved = K.SAMPLES; K.SAMPLES = [];
+      for (const f of ['hydro_king_jp', 'hydro_king_fr']) await new Promise((r) => { const s = document.createElement('script'); s.src = 'samples/' + f + '.js'; s.onload = s.onerror = r; document.head.appendChild(s); });
+      const real = K.SAMPLES; K.SAMPLES = saved;
+      out.real = real.map((s) => { const p = K.normalizeProject(s.project); return { title: p.title, yt: p.youtube, lines: p.lines.length, raw: s.project.lines.length, dur: p.duration, bad: p.lines.filter((l) => !l.units.every((u) => isFinite(u.s)) || !(l.end > K.ls(l))).length }; });
+      ok('shippedSamples', out.real.length === 2 && out.real.every((r) => r.yt === ID && r.lines === r.raw && r.lines > 60 && !r.bad && r.dur > 200) && out.real.map((r) => r.title).join() === 'hydro_king_jp,hydro_king_fr', out.real);
+      ok('shippedSampleNames', real.every((s) => K.has('sample.' + s.project.title)));
+      K.dirty = false; K.setProject(K.normalizeProject(real[0].project), false, { src: 'sample' }); await ytReady();
+      ok('sampleUsesYouTube', K.mediaMode() === 'yt' && fp().videoId === ID, { mode: K.mediaMode() });
+      K.setYouTube(''); delete window.YT;
+      K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false; await frames(2);
+      ok('ytCleanup', K.mediaMode() === '' && K.yt.available() === false && document.getElementById('bYtSet').hidden && document.getElementById('ytBar').hidden); }
 
   } catch (e) { out.error = String(e && e.stack || e); }
   const pre = document.createElement('pre'); pre.id = 'result';

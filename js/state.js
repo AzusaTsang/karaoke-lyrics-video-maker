@@ -395,7 +395,20 @@
   };
 
   /* ---------- 工程 ---------- */
-  K.blank = () => ({ app: 'karaoke-studio', version: 1, title: K.t ? K.t('untitled') : '未命名', duration: 60, mediaName: '', settings: Object.assign({}, K.DEF), lines: [] });
+  /* youtube：YouTube 视频 ID（11 位），用作播放时钟的另一种来源；'' = 没有 */
+  K.blank = () => ({ app: 'karaoke-studio', version: 1, title: K.t ? K.t('untitled') : '未命名', duration: 60, mediaName: '', youtube: '', settings: Object.assign({}, K.DEF), lines: [] });
+  /* 从 YouTube 链接（watch / youtu.be / shorts / embed / live / music，含 nocookie）或 11 位 ID 取出视频 ID；认不出返回 '' */
+  const YT_ID = /^[A-Za-z0-9_-]{11}$/;
+  K.ytId = (s) => {
+    s = typeof s === 'string' ? s.trim() : '';
+    if (YT_ID.test(s)) return s;
+    let u; try { u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(s) ? s : 'https://' + s); } catch (e) { return ''; }
+    const h = u.hostname.toLowerCase().replace(/^(www|m|music)\./, ''), seg = u.pathname.split('/').filter(Boolean);
+    let id = '';
+    if (h === 'youtu.be') id = seg[0];
+    else if (h === 'youtube.com' || h === 'youtube-nocookie.com') id = seg[0] === 'watch' || !seg.length ? u.searchParams.get('v') : ['embed', 'shorts', 'live', 'v', 'e'].includes(seg[0]) ? seg[1] : '';
+    return id && YT_ID.test(id) ? id : '';
+  };
   K.sortLines = () => K.project.lines.sort((a, b) => K.ls(a) - K.ls(b));
 
   /* 工程文件不可信：逐项校验 / 转换类型 */
@@ -410,6 +423,7 @@
     if (!j || typeof j !== 'object') j = {};
     if (str(j.title, 200).trim()) p.title = str(j.title, 200);
     p.mediaName = str(j.mediaName, 260);
+    p.youtube = K.ytId(j.youtube);
     p.settings = K.cleanSettings(j.settings);
     let maxEnd = 0; const ids = new Set();
     (Array.isArray(j.lines) ? j.lines : []).forEach((c) => {

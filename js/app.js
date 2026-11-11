@@ -3,20 +3,26 @@
   const K = window.K, $ = (id) => document.getElementById(id), T = K.t;
   /* 发布信息：仓库地址只在这里写一次（帮助 → 关于里会显示）。fork 后改成自己的仓库地址 */
   K.APP = { version: '1.0.0', repo: 'https://github.com/AzusaTsang/karaoke-lyrics-video-maker' };
-  const media = $('media'); let hasMedia = false;
+  /* 播放时钟有三种来源：mode = 'file'（本地音视频）/ 'yt'（YouTube，见 youtube.js）/ ''（无声的内部时钟） */
+  const media = $('media'), Y = K.yt; let mode = '', fileName = '';
   const clk = { playing: false, t: 0, last: 0 };
-  K.hasMedia = () => hasMedia;
-  K.dur = () => (hasMedia && isFinite(media.duration) ? media.duration : K.project.duration);
-  K.now = () => (hasMedia ? media.currentTime : clk.t);
-  K.seek = (t) => { t = Math.max(0, Math.min(K.dur(), t)); if (hasMedia) media.currentTime = t; else clk.t = t; if (K.tlReveal && !K.tl.scrubbing) K.tlReveal(t); };
-  K.playing = () => (hasMedia ? !media.paused : clk.playing);
-  K.play = () => { if (hasMedia) media.play().catch(() => {}); else { if (clk.t >= K.dur()) clk.t = 0; clk.playing = true; clk.last = performance.now(); } };
-  K.pause = () => { if (hasMedia) media.pause(); clk.playing = false; };
+  K.hasMedia = () => mode !== '';
+  K.mediaMode = () => mode;
+  K.dur = () => (mode === 'file' && isFinite(media.duration) ? media.duration : mode === 'yt' && Y.dur() > 0 ? Y.dur() : K.project.duration);
+  K.now = () => (mode === 'file' ? media.currentTime : mode === 'yt' ? Y.now() : clk.t);
+  K.seek = (t) => { t = Math.max(0, Math.min(K.dur(), t)); if (mode === 'file') media.currentTime = t; else if (mode === 'yt') Y.seek(t); else clk.t = t; if (K.tlReveal && !K.tl.scrubbing) K.tlReveal(t); };
+  K.playing = () => (mode === 'file' ? !media.paused : mode === 'yt' ? Y.playing() : clk.playing);
+  K.play = () => {
+    if (mode === 'file') media.play().catch(() => {});
+    else if (mode === 'yt') { if (K.now() >= K.dur() - 0.05) Y.seek(0); Y.play(); }
+    else { if (clk.t >= K.dur()) clk.t = 0; clk.playing = true; clk.last = performance.now(); }
+  };
+  K.pause = () => { if (mode === 'file') media.pause(); else if (mode === 'yt') Y.pause(); clk.playing = false; };
 
   /* ---------- 播放速度：媒体保持音高；没有媒体时内部时钟同样按这个速度走 ---------- */
   K.SPEEDS = [0.5, 0.75, 1, 1.25];
   K.ui.speed = K.SPEEDS.includes(K.pref('speed')) ? K.pref('speed') : 1;
-  const applyRate = () => { media.preservesPitch = media.mozPreservesPitch = media.webkitPreservesPitch = true; media.defaultPlaybackRate = media.playbackRate = K.ui.speed; };
+  const applyRate = () => { media.preservesPitch = media.mozPreservesPitch = media.webkitPreservesPitch = true; media.defaultPlaybackRate = media.playbackRate = K.ui.speed; Y.setRate(K.ui.speed); };
   K.setSpeed = (v) => { v = +v; if (!K.SPEEDS.includes(v)) v = 1; K.ui.speed = v; applyRate(); K.pref('speed', v); $('speed').value = String(v); };
   K.stepSpeed = (d) => { const i = K.SPEEDS.indexOf(K.ui.speed); K.setSpeed(K.SPEEDS[Math.max(0, Math.min(K.SPEEDS.length - 1, i + d))]); K.toast(T('msg.speed', { v: K.ui.speed })); };
 
@@ -33,9 +39,9 @@
   };
   K.playLine = () => { const l = K.sel(); if (!l) return; K.seek(Math.max(0, K.ls(l) + K.S().offset - PRE)); K.play(); };
 
-  /* ---------- 音量 / 静音（只对载入的媒体） ---------- */
+  /* ---------- 音量 / 静音（只对载入的媒体；数值记在 <video> 上，YouTube 播放器跟着它） ---------- */
   K.setVolume = (v, muted) => {
-    media.volume = Math.max(0, Math.min(1, +v || 0)); media.muted = !!muted;
+    media.volume = Math.max(0, Math.min(1, +v || 0)); media.muted = !!muted; Y.setVolume(media.volume, media.muted);
     K.pref('vol', media.volume); K.pref('muted', media.muted);
     const b = $('bMute'), off = media.muted || media.volume === 0; b.textContent = off ? '🔇' : '🔊';
     b.setAttribute('aria-pressed', media.muted); b.setAttribute('aria-label', T(media.muted ? 'bar.unmute' : 'bar.mute')); b.title = T(media.muted ? 'bar.unmute' : 'bar.mute');
@@ -47,15 +53,21 @@
   const syncEnd = () => { if (!eEndManual) $('eEnd').value = K.dur().toFixed(2); };
 
   /* ---------- 媒体 ---------- */
-  let mediaUrl = null, mediaTok = 0, bannerOff = false;
+  let mediaUrl = null, mediaTok = 0, bannerOff = false, ytFail = '';
   async function loadMedia(f) {
     const tok = ++mediaTok;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     const wasPlaying = K.playing(), t = K.now(); K.pause();
-    mediaUrl = URL.createObjectURL(f); media.src = mediaUrl; hasMedia = true; K.peaks = null; applyRate(); K.invalidate();
+    if (mode === 'yt') Y.detach();                      // 本地文件优先；工程里的 YouTube 链接保留
+    mediaUrl = URL.createObjectURL(f); media.src = mediaUrl; mode = 'file'; fileName = f.name; K.peaks = null; applyRate(); K.invalidate();
     K.project.mediaName = f.name; mediaUi();
     media.onloadedmetadata = () => { if (tok !== mediaTok) return; K.project.duration = Math.ceil(media.duration * 100) / 100; applyRate(); if (t > 0 && t < media.duration) media.currentTime = t; syncEnd(); K.autosave(); K.invalidate(); if (wasPlaying) K.play(); };
-    media.onerror = () => { if (tok !== mediaTok) return; hasMedia = false; mediaUi(); K.toast(T('msg.mediaFail', { name: f.name }), 'error'); };
+    media.onerror = () => {
+      if (tok !== mediaTok) return;
+      mode = ''; fileName = ''; clk.t = t; K.toast(T('msg.mediaFail', { name: f.name }), 'error');
+      if (K.project.youtube) useYt(K.project.youtube);     // 放不了就退回工程里的 YouTube 视频
+      mediaUi();
+    };
     if (f.size > 400 * 1024 * 1024) { K.toast(T('msg.bigMedia')); return; }
     let ac = null;
     try {
@@ -67,21 +79,57 @@
     finally { if (ac) ac.close().catch(() => {}); }
   }
   K.loadMedia = loadMedia;
+  /* 换成 YouTube 视频（从当前时间接着走）。播放器出错时退回无声时钟 */
+  function useYt(id) {
+    const wasPlaying = K.playing(), t = K.now(); K.pause();
+    if (!Y.available()) { ytFail = id; return; }
+    ++mediaTok;                                          // 丢掉还在加载的本地文件
+    if (mode === 'file') { media.removeAttribute('src'); media.load(); if (mediaUrl) URL.revokeObjectURL(mediaUrl); mediaUrl = null; fileName = ''; K.peaks = null; }
+    mode = 'yt'; ytFail = '';
+    Y.attach(id, t, {
+      ready: () => { const d = Y.dur(); if (d > 0) K.project.duration = Math.ceil(d * 100) / 100; applyRate(); syncEnd(); mediaUi(); K.invalidate(); },
+      state: () => { mediaUi(); K.invalidate(); },
+      error: (why, t0) => { if (mode !== 'yt') return; mode = ''; ytFail = id; clk.t = t0; clk.playing = false; mediaUi(); K.toast(T('yt.fail', { why: K.ytWhy(why) }), 'error'); },
+    });
+    if (wasPlaying) Y.play();
+    mediaUi(); K.invalidate();
+  }
+  function dropYt() { if (mode !== 'yt') return; const t = K.now(); Y.detach(); mode = ''; clk.t = t; clk.playing = false; mediaUi(); K.invalidate(); }
+  /* 工程变了（打开 / 新建 / 撤销）：让播放器跟上工程里的 YouTube 链接。
+     已载入本地文件时，只有换了工程、而且这个文件不是新工程记着的那个，才换成 YouTube */
+  function syncYt(why) {
+    const id = K.project.youtube || '';
+    if (mode === 'file') { if (why === 'project' && id && fileName !== K.project.mediaName) useYt(id); return; }
+    if (id && (mode !== 'yt' || Y.id() !== id)) { if (why === 'project' || ytFail !== id) useYt(id); }
+    else if (!id) dropYt();
+  }
+  /* 「使用 YouTube 视频」对话框 / 拖入链接：id = '' 表示移除链接 */
+  K.setYouTube = (id) => {
+    if ((K.project.youtube || '') !== id) { K.project.youtube = id; K.commit('media'); }
+    if (id) { useYt(id); if (!Y.available()) K.toast(T('yt.fail', { why: K.ytWhy('network') }), 'error'); } else dropYt();
+  };
+  K.mediaMenu = (btn) => {
+    const r = btn.getBoundingClientRect();
+    K.menu(r.left, r.bottom + 4, [[T('media.file'), K.pickMedia], [T('media.yt'), () => K.youtubeDialog()], ...(mode === 'yt' ? [[T('media.ytSet'), () => Y.settings(true)]] : [])]);
+    const f = document.querySelector('#menu button'); if (f) f.focus();
+  };
   /* 视频帧到位 / 跳转完成时时间可能没变，但画面（视频背景）要更新 */
   ['seeked', 'loadeddata', 'pause', 'play'].forEach((ev) => media.addEventListener(ev, K.invalidate));
   K.pickMedia = () => { const i = $('fOpen'); i.accept = 'audio/*,video/*'; i.value = ''; i.onchange = () => i.files[0] && queue(() => loadMedia(i.files[0])); i.click(); };
 
   /* 顶栏的媒体名、预览区的“缺少媒体”横幅、音量控件 */
   function mediaUi() {
-    const mn = $('mediaName'), name = K.project.mediaName;
-    mn.textContent = hasMedia ? name : T('top.noMedia'); mn.title = hasMedia ? name : T('top.mediaTip');
-    mn.classList.toggle('has', hasMedia);
-    $('bMute').disabled = $('vol').disabled = !hasMedia;
-    const bn = $('mbanner'), show = !hasMedia && !bannerOff && (K.doc.src === 'sample' || !!name);
+    const mn = $('mediaName'), name = K.project.mediaName, has = mode !== '', yt = K.project.youtube;
+    const label = mode === 'yt' ? 'YouTube · ' + (Y.title() || (Y.ready() ? Y.id() : T('yt.loading'))) : name;
+    mn.textContent = has ? label : T('top.noMedia'); mn.title = has ? (mode === 'yt' ? 'https://youtu.be/' + Y.id() : name) : T('top.mediaTip');
+    mn.classList.toggle('has', has);
+    $('bYtSet').hidden = mode !== 'yt';
+    $('bMute').disabled = $('vol').disabled = !has;
+    const bn = $('mbanner'), show = !has && !bannerOff && (K.doc.src === 'sample' || !!name || !!yt);
     bn.hidden = !show;
     if (show) {
-      bn.querySelector('.tx').textContent = K.doc.src === 'sample' ? T('mb.sample') : T('mb.missing', { name });
-      bn.querySelector('.sub').textContent = K.doc.src === 'sample' ? '' : T('mb.drop');
+      bn.querySelector('.tx').textContent = yt ? T('mb.yt') : K.doc.src === 'sample' ? T('mb.sample') : T('mb.missing', { name });
+      bn.querySelector('.sub').textContent = yt || K.doc.src === 'sample' ? '' : T('mb.drop');
     }
   }
   K.mediaUi = mediaUi;
@@ -114,6 +162,8 @@
     }).filter((c) => c && c.text);
   }
   K.parseSrt = parseSrt;
+  /* 新建 / 导入 SRT、LRC 时沿用正在播放的 YouTube 视频（和本地媒体一样留着） */
+  const keepYt = () => (mode === 'yt' ? Y.id() : '');
   const isMedia = (f) => /\.(mp3|wav|m4a|aac|flac|ogg|opus|mp4|mov|mkv|webm)$/i.test(f.name) || /^(audio|video)\//.test(f.type);
   /* 换工程：旧工程有未保存修改时先确认；新工程来源记在 K.doc 里 */
   const replaceProject = async (p, doc, what) => {
@@ -127,8 +177,8 @@
     let p, srt = name.endsWith('.srt'), lrc = name.endsWith('.lrc');
     try {
       const txt = await f.text();
-      if (srt) { p = K.normalizeProject({ lines: parseSrt(txt) }); p.settings = K.cleanSettings(K.S()); p.title = f.name.replace(/\.srt$/i, ''); }
-      else if (lrc) { p = K.normalizeProject(K.parseLrc(txt)); p.settings = K.cleanSettings(K.S()); if (isUntitled(p.title)) p.title = f.name.replace(/\.lrc$/i, ''); }
+      if (srt) { p = K.normalizeProject({ lines: parseSrt(txt) }); p.settings = K.cleanSettings(K.S()); p.youtube = keepYt(); p.title = f.name.replace(/\.srt$/i, ''); }
+      else if (lrc) { p = K.normalizeProject(K.parseLrc(txt)); p.settings = K.cleanSettings(K.S()); p.youtube = keepYt(); if (isUntitled(p.title)) p.title = f.name.replace(/\.lrc$/i, ''); }
       else { p = K.normalizeProject(JSON.parse(txt)); if (isUntitled(p.title)) p.title = f.name.replace(/(\.kara)?\.json$/i, ''); }
     } catch (e) { K.toast(T('msg.readFail', { msg: e.message }), 'error'); return; }
     const isProj = !srt && !lrc && name.endsWith('.json');
@@ -147,7 +197,7 @@
   }
   K.openDialog = openDialog;
   K.loadSample = (i) => { const s = K.SAMPLES[i]; return s ? replaceProject(K.normalizeProject(s.project), { src: 'sample' }, 'sample') : Promise.resolve(false); };
-  K.newProject = () => { const p = K.blank(); p.settings = K.cleanSettings(K.S()); return replaceProject(p, { src: 'new' }, 'new'); };
+  K.newProject = () => { const p = K.blank(); p.settings = K.cleanSettings(K.S()); p.youtube = keepYt(); return replaceProject(p, { src: 'new' }, 'new'); };
   /* 欢迎页“试试示例”：已经是没改过的示例就直接用；然后从第一句前开始播放 */
   K.trySample = async () => {
     if (!(K.doc.src === 'sample' && !K.dirty && K.project.lines.length) && !(await K.loadSample(0))) return;
@@ -210,20 +260,21 @@
 
   /* ---------- 每帧 ----------
      画布由 drawStage / drawTimeline 自己判断要不要重画；DOM 文字 / 属性只在变化时写入 */
-  const shown = {};
+  const shown = {}, cv = $('cv');
   const setText = (id, s) => { if (shown[id] !== s) { shown[id] = s; $(id).textContent = s; } };
   const setOnce = (k, v, fn) => { if (shown[k] !== v) { shown[k] = v; fn(); } };
   K.tick = (ts) => {
-    if (!hasMedia && clk.playing) { clk.t += ((ts - clk.last) / 1000) * K.ui.speed; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; } }
-    const lr = K.loopRange(); if (lr && K.playing() && (K.now() >= lr[1] || (!hasMedia && clk.t >= K.dur()))) { K.seek(lr[0]); if (!K.playing()) K.play(); }
+    if (!mode && clk.playing) { clk.t += ((ts - clk.last) / 1000) * K.ui.speed; clk.last = ts; if (clk.t >= K.dur()) { clk.t = K.dur(); clk.playing = false; } }
+    const lr = K.loopRange(); if (lr && K.playing() && (K.now() >= lr[1] || (!mode && clk.t >= K.dur()))) { K.seek(lr[0]); if (!K.playing()) K.play(); }
     const t = K.now();
-    K.drawStage(hasMedia ? media : null);
+    K.drawStage(mode === 'file' ? media : null);
+    if (mode === 'yt') Y.layout(cv, K.S().useVideoBg);
     if (!document.body.classList.contains('rec')) {
       K.drawTimeline(); K.refreshPanels(); K.markNow(t - K.S().offset);
       const pl = K.playing();
       setOnce('play', pl + K.lang, () => { const b = $('bPlay'); b.textContent = pl ? '⏸' : '▶'; b.setAttribute('aria-label', T(pl ? 'bar.pause' : 'bar.play')); });
       setText('tm', K.fmt(t) + ' / ' + K.fmt(K.dur()));
-      setOnce('clock', [hasMedia, pl, K.lang].join(), () => { const c = $('clock'); c.hidden = hasMedia; c.classList.toggle('on', pl); });
+      setOnce('clock', [mode, pl, K.lang].join(), () => { const c = $('clock'); c.hidden = !!mode; c.classList.toggle('on', pl); });
       const si = saveInfo();
       setOnce('save', si.join('|'), () => { const b = $('saveState'); b.className = 'chip ' + si[0]; b.querySelector('span').textContent = si[1]; b.title = si[2]; b.setAttribute('aria-label', si[1] + '. ' + si[2]); });
       const dt = (K.dirty ? '● ' : '') + (K.project.title || T('untitled')) + ' — ' + T('app.name');
@@ -255,7 +306,7 @@
     $('title').value = K.project.title; syncEnd();
     $('title').onchange = (e) => { K.project.title = e.target.value; K.commit('title'); };
     $('eEnd').addEventListener('input', (e) => { eEndManual = e.target.value.trim() !== ''; });
-    K.on('load', (why) => { if (why === 'project') { eEndManual = false; bannerOff = false; } $('title').value = K.project.title; syncEnd(); $('s_fps').value = K.S().fps; mediaUi(); K.renderEmpty(); });
+    K.on('load', (why) => { if (why === 'project') { eEndManual = false; bannerOff = false; } syncYt(why); $('title').value = K.project.title; syncEnd(); $('s_fps').value = K.S().fps; mediaUi(); K.renderEmpty(); });
     K.on('change', () => { undoUi(); if (!K.project.lines.length !== !$('empty').hidden) K.renderEmpty(); });
     $('s_fps').value = K.S().fps; $('s_fps').onchange = (e) => { K.S().fps = +e.target.value; K.commit('settings'); };
 
@@ -274,7 +325,7 @@
     $('bSave').onclick = save; $('bSaveAs').onclick = saveAs;
     $('saveState').onclick = save;
     $('bImport').onclick = () => K.importMenu($('bImport'));
-    $('bMedia').onclick = K.pickMedia; $('mbLoad').onclick = K.pickMedia;
+    $('bMedia').onclick = () => K.mediaMenu($('bMedia')); $('mbLoad').onclick = () => K.mediaMenu($('mbLoad'));
     $('mbClose').onclick = () => { bannerOff = true; mediaUi(); };
     $('bHelp').onclick = $('keys').onclick = () => K.showHelp();
     $('bUndo').onclick = K.undo; $('bRedo').onclick = K.redo;
@@ -291,7 +342,7 @@
     const setTool = (v) => { K.ui.tool = v === 'scrub' ? 'scrub' : 'retime'; document.querySelectorAll('#tool button').forEach((x) => { x.classList.toggle('on', x.dataset.v === K.ui.tool); x.setAttribute('aria-pressed', x.dataset.v === K.ui.tool); }); };
     document.querySelectorAll('#tool button').forEach((b) => (b.onclick = () => { setTool(b.dataset.v); K.pref('tool', K.ui.tool); }));
     setTool(K.pref('tool'));
-    $('bRec').onclick = () => { document.body.classList.add('rec'); document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
+    $('bRec').onclick = () => { Y.settings(false); document.body.classList.add('rec'); document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
     document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('rec'); });
     $('bPng').onclick = () => exportPng(false); $('bZip').onclick = () => exportPng(true); $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
     if (!window.showDirectoryPicker) { $('bPng').hidden = true; $('bZip').classList.add('pri'); $('bPng').classList.remove('pri'); }      // 没有文件夹 API：ZIP 就是主要方式
@@ -305,6 +356,8 @@
     addEventListener('drop', (e) => {
       e.preventDefault(); dragN = 0; dz.hidden = true;
       const dt = e.dataTransfer, items = [...(dt.items || [])].filter((it) => it.kind === 'file');
+      /* 没有文件、拖进来的是 YouTube 链接（如从地址栏 / 别的标签页）：用这个视频 */
+      if (!items.length && !(dt.files && dt.files.length)) { const id = K.ytId((dt.getData('text/uri-list') || dt.getData('text/plain') || '').split('\n')[0]); if (id) queue(() => K.setYouTube(id)); return; }
       const jobs = items.length
         ? items.map((it) => ({ file: it.getAsFile(), handle: it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : null }))
         : [...(dt.files || [])].map((f) => ({ file: f, handle: null }));
@@ -324,6 +377,8 @@
       K.ui.tapArmed = false;
       if (K.ui.loop) { const r = K.loopRange(); if (!r) K.toggleLoop(false); else if (K.now() < r[0] || K.now() > r[1]) K.seek(r[0]); }
     });
+    Y.init($('ytBox'), $('ytBar')); syncYt('project');
+    $('bYtSet').onclick = () => Y.settings(!Y.inSettings());
     hint(); undoUi(); mediaUi(); K.renderEmpty(); loopUi();
     K.ensureFont();
     if (first) {

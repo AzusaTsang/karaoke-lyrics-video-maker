@@ -129,6 +129,7 @@
     lastKey = key; K.stats.stage++;
     let bg = S.bgMode === 'color' ? 'color' : rec ? 'key' : 'none';
     if (vbg) bg = 'video';
+    else if (S.useVideoBg && K.mediaMode && K.mediaMode() === 'yt') bg = 'none';     // YouTube 播放器在画布下面，画布保持透明
     K.render(ctx, K.now(), { bg, video });
     if (rec) return true;
     /* ---- 编辑用叠加层（不会出现在导出里） ---- */

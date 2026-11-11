@@ -172,7 +172,27 @@ ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt 
 
 ## Optional: forced alignment
 
-A browser cannot do forced alignment, so `tools/align` provides Python scripts that separate the vocals (Demucs) and align an SRT to the singing per character (torchaudio MMS_FA; Japanese readings via pykakasi, Chinese via pypinyin). The result is a JSON file you import with *Add lyrics…* → *Import an SRT / LRC / JSON file…*. Alignment on singing is imprecise, so treat it as a first draft. See [tools/align/README.md](tools/align/README.md).
+A browser cannot do forced alignment, so `tools/align` provides Python scripts that turn an SRT with only one start and end per line into a **per-character timing draft**, which you then correct in the editor. Both built-in samples were made this way. Installation and every option are in [tools/align/README.md](tools/align/README.md).
+
+### How the draft is generated
+
+1. **Prepare an SRT**: one cue per lyric line, with roughly correct times. In Japanese lines, write `漢字（カタカナ）` to force a reading.
+2. **Separate the vocals**: `python separate.py --input song.mp4 --out-dir work`. Demucs (`htdemucs`) isolates the vocals from the **final audio** and writes `vocals_16k.wav`. Use the same version of the audio as the finished video, not stems from another version, or every time will be offset.
+3. **Split and read the text**: `align.py` detects the language of each line and splits it into the units to align:
+   - Japanese: readings from pykakasi; kanji blocks get furigana, okurigana anchors where a reading ends, and timing is per mora;
+   - Chinese: aligned through pinyin, no furigana;
+   - French, English, Russian and similar: accents stripped (Cyrillic transliterated), aligned per word, and the letters of a word share its time evenly.
+4. **Align**: `python align.py --srt song.srt --vocals work/vocals_16k.wav --out aligned.json`. The torchaudio MMS_FA model places those units on the vocals, in one of two modes:
+   - `--mode window` (default): each line is searched only within `--pad` seconds of its SRT time; use it when the SRT times are already close;
+   - `--mode global`: the whole song in one pass, which tolerates rough SRT times; a line whose start lands more than `--max-offset` seconds from its SRT start is redone in window mode.
+
+   Lines that cannot be aligned are split evenly over their SRT time and listed in the summary printed at the end.
+5. **Import**: in the app, *Load Media…* (the same song), then *Add lyrics…* → *Import an SRT / LRC / JSON file…* and choose `aligned.json`.
+6. **Correct**: start with the low-score and evenly split lines from the summary. Play and fix: drag the wipe cursor in the preview, drag the ticks on the timeline, or tap `T` again. Latin text is aligned per word, so syllable positions are yours to set; *Even out letters within syllables* repairs a word whose letters have bunched up. Fix wrong furigana in the lyric text field.
+
+For the built-in samples: the Japanese one used the default window mode; the French one (with Japanese, Russian, English and Chinese lines) had rougher SRT times and used global mode, with 3 lines falling back to window mode. Alignment scores on singing are low throughout (the medians for the two samples were about 0.29 and 0.08), and chorus or shouted lines are the least reliable, so this is a draft that saves you tapping everything from scratch, nothing more.
+
+You can skip all of this: pasted lyrics and plain SRT imports get evenly split times that you tap in with `T`, and *Auto furigana…* adds Japanese readings.
 
 ## Browser support
 

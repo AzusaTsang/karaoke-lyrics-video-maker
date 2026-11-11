@@ -44,7 +44,7 @@ python separate.py --input "C:/music/song.mp4" --out-dir work
 python align.py --srt song.srt --vocals work/vocals_16k.wav --out aligned.json
 ```
 
-Then in the app: **Load audio/video** (the same song), then **Import SRT / JSON...** and choose `aligned.json`. Play it back and fix what is
+Then in the app: **Load Media…** (the same song), then **Add lyrics…** → **Import an SRT / LRC / JSON file…** and choose `aligned.json`. Play it back and fix what is
 wrong with the cursor, the timeline or `T` tap-to-time.
 
 ### `separate.py`
@@ -107,7 +107,7 @@ ignored by the app.
 
 ## 简体中文
 
-这两个脚本为编辑器生成**逐字时间**的初稿：`separate.py` 用 Demucs 把人声从歌曲 / 视频里分离出来；`align.py` 用 torchaudio MMS_FA 把 SRT 歌词逐字对到人声上，输出可在应用里「导入 SRT / JSON…」的 JSON。
+这两个脚本为编辑器生成**逐字时间**的初稿：`separate.py` 用 Demucs 把人声从歌曲 / 视频里分离出来；`align.py` 用 torchaudio MMS_FA 把 SRT 歌词逐字对到人声上，输出可在应用里用「添加歌词…」→「导入 SRT / LRC / JSON 文件…」载入的 JSON。
 日语行用 pykakasi 生成注音（汉字块加注音、送假名定位、按假名拍对齐），中文行借拼音对齐（不加注音），法 / 英 / 俄等按词对齐，每行自动判断语言。
 
 ```bash
@@ -122,7 +122,7 @@ python align.py --srt song.srt --vocals work/vocals_16k.wav --out aligned.json  
 
 ## 日本語
 
-この 2 つのスクリプトは、エディタ用の**一文字ごとのタイミング**の下書きを作ります。`separate.py` が Demucs で曲・動画から歌声を分離し、`align.py` が torchaudio の MMS_FA で SRT の歌詞を歌声に一文字ずつ合わせて、アプリの「SRT / JSON を読み込み…」で取り込める JSON を出力します。
+この 2 つのスクリプトは、エディタ用の**一文字ごとのタイミング**の下書きを作ります。`separate.py` が Demucs で曲・動画から歌声を分離し、`align.py` が torchaudio の MMS_FA で SRT の歌詞を歌声に一文字ずつ合わせて、アプリの「歌詞を追加…」→「SRT・LRC・JSON ファイルを読み込む…」で取り込める JSON を出力します。
 日本語の行は pykakasi でふりがなを付け（漢字ブロックへのふりがな、送りがなによる位置合わせ、かな拍単位のアライメント）、中国語の行はピンイン経由で合わせ（ふりがなは付きません）、フランス語・英語・ロシア語などは単語単位です。言語は行ごとに自動判定されます。
 
 ```bash

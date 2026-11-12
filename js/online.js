@@ -3,7 +3,7 @@
 (function () {
   const K = window.K, $ = (id) => document.getElementById(id), T = (k, p) => K.t(k, p), et = (k, p) => K.esc(T(k, p));
   const AD_CLIENT = 'ca-pub-9423008043392488';
-  const AD_SLOT_EXPORT = '9256004414';   // 导出进度弹窗里的广告卡片：暂时和上面用同一个广告单元；在 AdSense 里另建一个单元后把 ID 换到这里，两处的收入就能分开看
+  const AD_SLOT_EXPORT = '7240817804';   // AdSense 展示广告单元「karaoke-lyrics-video-maker 导出进度弹窗」（自适应）
   const AD_SLOT = '9256004414';   // AdSense 展示广告单元「karaoke-lyrics-video-maker 广告对话框」（自适应）
 
   Object.assign(K.I18N['zh-CN'], {

@@ -256,7 +256,7 @@
     if (zip) {
       const est = await K.estimateSequence(g, bg, t0, n, fps), per = Math.max(50, Math.min(K.ZIP_PER, Math.floor(3e9 / Math.max(est.sample, 1))));
       if (est.bytes > K.ZIP_WARN && !(await K.zipConfirm(est, Math.ceil(n / per)))) return;
-      sink = K.zipSink({ total: n, per, base: 'lyrics_png', save: (b, name) => K.download(b, name) });
+      sink = K.zipSink({ total: n, per, base: K.exportBase(), save: (b, name) => K.download(b, name) });
     }
     cancel = false; busy(true); const st = performance.now();
     /* 主线程只画；PNG 编码交给线程池（pngpool.js），写文件 / 进 ZIP 也不挡着下一帧。
@@ -303,14 +303,14 @@
         draw: (f) => { const t = t0 + f / fps, key = K.frameKey(t, W, H); if (key !== lastKey) K.render(g, t, { bg }); lastKey = key; },
         progress: (f) => { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; expSay('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); } });
       if (!r) expSay('exp.cancelledMp4');             // 取消：半截视频没用，不保存
-      else { K.download(r.blob, 'lyrics.mp4'); $('prog').firstElementChild.style.width = '100%'; expSay('exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) }); }
+      else { K.download(r.blob, K.exportBase() + '.mp4'); $('prog').firstElementChild.style.width = '100%'; expSay('exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) }); }
     } catch (e) { expSay('exp.failed', { msg: e.message }); }
     busy(false);
   }
   function exportFrame() {
     const S = K.S(), c = document.createElement('canvas'); c.width = S.W; c.height = S.H;
     K.render(c.getContext('2d'), K.now(), { bg: expBg() });
-    c.toBlob((b) => download(b, `frame_${K.now().toFixed(2)}s.png`), 'image/png');
+    c.toBlob((b) => download(b, `${K.exportBase()}_${K.now().toFixed(2)}s.png`), 'image/png');
   }
 
   /* ---------- 每帧 ----------

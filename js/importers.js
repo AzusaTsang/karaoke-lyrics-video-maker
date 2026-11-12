@@ -199,8 +199,10 @@
   };
 
   /* 导出按钮（Export 标签页） */
+  /* 导出文件的主名：[工程名]_lyrics（工程名里不能当文件名的字符换成 _；没有工程名就只是 lyrics）。视频、ZIP、单帧、歌词文件都用它 */
+  K.exportBase = () => { const t = (K.project.title || '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim(); return (t ? t + '_' : '') + 'lyrics'; };
   K.bindLyricExport = () => {
-    const base = () => (K.project.title || 'lyrics').replace(/[\\/:*?"<>|]/g, '_');
+    const base = K.exportBase;
     const go = (id, ext, fn) => { $(id).onclick = () => { if (!K.project.lines.length) { K.toast(T('exp.noLines'), 'error'); return; } K.download(new Blob([fn()], { type: 'text/plain;charset=utf-8' }), base() + ext); K.toast(T('exp.saved', { name: base() + ext }), 'ok'); }; };
     go('bLrc', '.lrc', () => K.exportLrcText(true)); go('bLrcLines', '.lrc', () => K.exportLrcText(false)); go('bSrt', '.srt', K.exportSrtText); go('bAss', '.ass', K.exportAssText);
   };

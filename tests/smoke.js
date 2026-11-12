@@ -619,7 +619,7 @@ window.addEventListener('load', async () => {
         zb2.click(); await untilReal(() => dl.length && !zb2.disabled);
         const ZE = dl.length ? await parseZip(dl[0][1]) : null; K.download = od;
         out.zipE2E = ZE && { name: dl[0][0], n: ZE.entries.length, first: ZE.entries[0].name, bytes: ZE.entries.map((x) => x.size) };
-        ok('zipExportFileName', dl.length === 1 && dl[0][0] === 'lyrics_png.zip', dl.map((x) => x[0]));
+        ok('zipExportFileName', dl.length === 1 && dl[0][0] === K.project.title + '_lyrics.zip' && K.exportBase() === K.project.title + '_lyrics', dl.map((x) => x[0]));
         ok('zipExportContents', ZE && ZE.ok && ZE.entries.length === 5 && ZE.entries.map((x) => x.name).join() === 'lyrics_000001.png,lyrics_000002.png,lyrics_000003.png,lyrics_000004.png,lyrics_000005.png' && ZE.entries.every((x) => x.crcOk && x.stored && x.data[0] === 0x89 && x.data[1] === 0x50 && x.data[2] === 0x4e && x.data[3] === 0x47), out.zipE2E);
         ok('zipExportMessage', document.getElementById('expMsg').textContent === K.t('exp.doneZip', { n: 5, w: K.S().W, h: K.S().H, fps: 24, t0: 28, z: 1 }), document.getElementById('expMsg').textContent);
         /* 画面指纹：空白是 ''；正在擦的两帧不同；同一时刻相同 */
@@ -636,7 +636,7 @@ window.addEventListener('load', async () => {
             for (let o = 0; o + 8 <= u.length;) { const s = d.getUint32(o) === 1 ? d.getUint32(o + 8) * 4294967296 + d.getUint32(o + 12) : d.getUint32(o); top.push(tag(o)); if (s < 8) break; o += s; if (o === u.length) top.push('END'); }
             const find = (t) => { for (let i = 0; i + 4 <= u.length; i++) if (u[i] === t.charCodeAt(0) && u[i + 1] === t.charCodeAt(1) && u[i + 2] === t.charCodeAt(2) && u[i + 3] === t.charCodeAt(3)) return i; return -1; }, sz = find('stsz');
             out.mp4 = { name: dv[0] && dv[0][0], bytes: u.length, top, frames: sz > 0 ? d.getUint32(sz + 12) : -1, msg: msg.textContent };
-            ok('mp4Export', dv.length === 1 && dv[0][0] === 'lyrics.mp4' && top.join() === 'ftyp,mdat,moov,END' && out.mp4.frames === 5 && find('avcC') > 0 && find('co64') > 0, out.mp4);
+            ok('mp4Export', dv.length === 1 && dv[0][0] === K.project.title + '_lyrics.mp4' && top.join() === 'ftyp,mdat,moov,END' && out.mp4.frames === 5 && find('avcC') > 0 && find('co64') > 0, out.mp4);
             ok('mp4ExportMessage', msg.textContent === K.t('exp.doneMp4', { n: 5, w: W, h: H, fps: 24, t0: 28, size: K.fmtBytes(u.length) }), msg.textContent);
             /* 导出提示跟着界面语言走 */
             const zhMsg = msg.textContent; K.setLang('en'); await frames(1); const enMsg = msg.textContent; K.setLang('zh-CN'); await frames(1);

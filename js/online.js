@@ -30,6 +30,11 @@
     'on.expTitle': 'Export progress', 'on.expCancel': 'Cancel export', 'on.expWait': 'Preparing…',
     'on.expHint': 'Closing this window does not stop the export; progress is still shown in the Export tab. While you wait, revenue from the ad below helps keep this tool maintained.',
   });
+  /* 首页标题（没动过的内置示例时显示，搜索引擎抓到的就是它）：带上各语言的搜索关键词。
+     爬虫多半按英文界面渲染，所以英文那条里也放了日语 / 中文的词；index.html 里静态的 <title> 要和英文这条保持一致 */
+  K.I18N.en['app.titleHome'] = 'Karaoke Lyrics Video Maker – Free Online Karaoke Subtitle Maker | ニコカラ・カラオケ字幕 | 卡拉OK字幕制作';
+  K.I18N.ja['app.titleHome'] = 'ニコカラ・カラオケ字幕メーカー（無料・ブラウザーで作成） – Karaoke Lyrics Video Maker';
+  K.I18N['zh-CN']['app.titleHome'] = '卡拉OK歌词视频 / 字幕制作器（免费在线） – Karaoke Lyrics Video Maker';
   /* 在线版用了 Google Analytics 和 AdSense：在「关于」的隐私说明后面如实补一句 */
   const PRIV = {
     'zh-CN': ' 在线版另外使用 Google Analytics 统计访问量，并通过 Google AdSense 展示广告：这两项会向 Google 发送请求，可能使用 Cookie；你的音视频、歌词和工程仍然不会上传。',

@@ -333,7 +333,9 @@
       setOnce('clock', [mode, pl, K.lang].join(), () => { const c = $('clock'); c.hidden = !!mode; c.classList.toggle('on', pl); });
       const si = saveInfo();
       setOnce('save', si.join('|'), () => { const b = $('saveState'); b.className = 'chip ' + si[0]; b.querySelector('span').textContent = si[1]; b.title = si[2]; b.setAttribute('aria-label', si[1] + '. ' + si[2]); });
-      const dt = (K.dirty ? '● ' : '') + (K.project.title || T('untitled')) + ' — ' + T('app.name');
+      /* 刚打开、还是没动过的内置示例：标题只写应用名（搜索引擎抓到的就是这个；可用 app.titleHome 覆盖，在线版换成带关键词的），不带示例的名字 */
+      const home = K.doc.src === 'sample' && !K.dirty;
+      const dt = home ? (K.I18N[K.lang] || {})['app.titleHome'] || T('app.name') : (K.dirty ? '● ' : '') + (K.project.title || T('untitled')) + ' — ' + T('app.name');
       if (document.title !== dt) document.title = dt;
     }
   };

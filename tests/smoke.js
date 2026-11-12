@@ -24,6 +24,7 @@ window.addEventListener('load', async () => {
       out.first = { open: !!(wd && wd.open), src: K.doc.src, dirty: K.dirty, lines: K.project.lines.length, visible: K.visible(K.now() - K.S().offset, 1920, 1080).length };
       ok('welcomeOnFirstRun', out.first.open && K.modalOpen(), out.first);
       ok('sampleBehindWelcome', out.first.src === 'sample' && !out.first.dirty && out.first.lines > 10 && out.first.visible > 0, out.first);
+      ok('homeTitleIsAppName', document.title === ((K.I18N[K.lang] || {})['app.titleHome'] || K.t('app.name')) && !document.title.includes(K.project.title), document.title);
       const acts = [...document.querySelectorAll('#welcomeActions [data-act]')].map((b) => b.dataset.act);
       ok('welcomeActions', ['sample', 'import', 'open', 'empty'].every((a) => acts.includes(a)) && acts.length === K.welcomeActions.filter((a) => a.where.includes('welcome')).length, acts);
       ok('welcomeFocusInside', wd && wd.contains(document.activeElement));

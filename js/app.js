@@ -236,6 +236,10 @@
   let cancel = false;
   const expBg = () => ($('eBg').value === 'color' ? 'color' : 'none');
   /* zip = true：不用文件夹，打成 ZIP 下载（太多帧时分成多个 ZIP，见 zip.js） */
+  /* 导出页的那行提示：记下翻译 key 和参数，切换界面语言时重新生成（否则“已取消 / 完成 / 失败”会停在旧语言上） */
+  let expLast = null;
+  const expSay = (k, p) => { expLast = [k, p]; $('expMsg').textContent = T(k, p); };
+  K.on('lang', () => { if (expLast) $('expMsg').textContent = T(expLast[0], expLast[1]); });
   const busy = (on) => { $('bCancel').hidden = !on; $('bPng').disabled = $('bZip').disabled = $('bMp4').disabled = on; };
   async function exportPng(zip) {
     let dir = null;
@@ -275,13 +279,13 @@
         const job = (zip ? (tail = tail.then(() => bp).then(put)) : bp.then(put)).catch((e) => { err = err || e; });
         live.add(job); job.then(() => live.delete(job));
         while (live.size >= lim) await Promise.race(live);
-        if (f % 10 === 0) { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); await new Promise((r) => setTimeout(r)); }
+        if (f % 10 === 0) { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; expSay('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); await new Promise((r) => setTimeout(r)); }
       }
       await Promise.all(live); if (err) throw err;
       if (!(cancel && zip)) await sink.end();                              // 取消 ZIP：手上还没出的这一卷直接丢掉，不下载
-      if (cancel) $('expMsg').textContent = T(!zip ? 'exp.cancelled' : sink.files() ? 'exp.cancelledZipParts' : 'exp.cancelledZip', { n: f, z: sink.files() });
-      else { $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
-    } catch (e) { await Promise.all(live); $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
+      if (cancel) expSay(!zip ? 'exp.cancelled' : sink.files() ? 'exp.cancelledZipParts' : 'exp.cancelledZip', { n: f, z: sink.files() });
+      else { $('prog').firstElementChild.style.width = '100%'; expSay(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
+    } catch (e) { await Promise.all(live); expSay('exp.failed', { msg: e.message }); }
     if (pool) pool.close();
     busy(false);
   }
@@ -297,10 +301,10 @@
     try {
       const r = await K.encodeVideo({ canvas: c, cfg, fps, frames: n, cancelled: () => cancel,
         draw: (f) => { const t = t0 + f / fps, key = K.frameKey(t, W, H); if (key !== lastKey) K.render(g, t, { bg }); lastKey = key; },
-        progress: (f) => { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); } });
-      if (!r) $('expMsg').textContent = T('exp.cancelledMp4');             // 取消：半截视频没用，不保存
-      else { K.download(r.blob, 'lyrics.mp4'); $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T('exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) }); }
-    } catch (e) { $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
+        progress: (f) => { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; expSay('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); } });
+      if (!r) expSay('exp.cancelledMp4');             // 取消：半截视频没用，不保存
+      else { K.download(r.blob, 'lyrics.mp4'); $('prog').firstElementChild.style.width = '100%'; expSay('exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) }); }
+    } catch (e) { expSay('exp.failed', { msg: e.message }); }
     busy(false);
   }
   function exportFrame() {

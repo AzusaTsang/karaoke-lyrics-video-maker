@@ -278,8 +278,8 @@
         if (f % 10 === 0) { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); await new Promise((r) => setTimeout(r)); }
       }
       await Promise.all(live); if (err) throw err;
-      await sink.end();
-      if (cancel) $('expMsg').textContent = T(zip ? 'exp.cancelledZip' : 'exp.cancelled', { n: f });
+      if (!(cancel && zip)) await sink.end();                              // 取消 ZIP：手上还没出的这一卷直接丢掉，不下载
+      if (cancel) $('expMsg').textContent = T(!zip ? 'exp.cancelled' : sink.files() ? 'exp.cancelledZipParts' : 'exp.cancelledZip', { n: f, z: sink.files() });
       else { $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
     } catch (e) { await Promise.all(live); $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
     if (pool) pool.close();

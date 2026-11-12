@@ -94,8 +94,9 @@
       <div class="row"><label for="s_fps" data-i18n="exp.fps">Frame rate</label><select id="s_fps"><option>24</option><option>25</option><option>30</option><option>50</option><option>60</option></select></div>
       <div class="row"><label data-i18n="exp.range">Range (s)</label><input id="eStart" type="number" step="0.1" value="0" data-i18n-title="exp.start" data-i18n-aria="exp.start"><input id="eEnd" type="number" step="0.1" data-i18n-title="exp.end" data-i18n-aria="exp.end"></div>
       <div class="row"><label for="eBg" data-i18n="exp.bg">Background</label><select id="eBg"><option value="transparent" data-i18n="exp.bgNone">Transparent</option><option value="color" data-i18n="exp.bgColor">Solid color</option></select></div>
-      <div class="btns"><button id="bPng" class="pri" data-i18n="exp.go">Export PNG sequence to folder…</button><button id="bZip" data-i18n="exp.zip" data-i18n-title="exp.zipTip">Download as ZIP…</button><button id="bFrame" data-i18n="exp.frame">Save current frame</button><button id="bCancel" data-i18n="exp.cancel" hidden>Cancel</button></div>
+      <div class="btns"><button id="bPng" class="pri" data-i18n="exp.go">Export PNG sequence to folder…</button><button id="bZip" data-i18n="exp.zip" data-i18n-title="exp.zipTip">Download as ZIP…</button><button id="bMp4" data-i18n="exp.mp4" data-i18n-title="exp.mp4Tip">Export video (MP4)…</button><button id="bFrame" data-i18n="exp.frame">Save current frame</button><button id="bCancel" data-i18n="exp.cancel" hidden>Cancel</button></div>
       <div class="hint" data-i18n="exp.zipHint"></div>
+      <div class="hint" data-i18n="exp.mp4Hint"></div>
       <div id="prog"><i></i></div><div class="hint" id="expMsg" aria-live="polite"></div>
       <div class="hint"><span data-i18n="exp.premiere"></span><br><span data-i18n="exp.prores"></span><br><code>ffmpeg -framerate 60 -i lyrics_%06d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le lyrics.mov</code></div>
       <h4 data-i18n="exp.lyr">Lyrics files</h4>
@@ -126,6 +127,8 @@
 <script src="js/ops.js"></script>
 <script src="js/dialogs.js"></script>
 <script src="js/zip.js"></script>
+<script src="js/pngpool.js"></script>
+<script src="js/mp4.js"></script>
 <script src="js/importers.js"></script>
 <script src="js/furigana.js"></script>
 <script src="js/keys.js"></script>

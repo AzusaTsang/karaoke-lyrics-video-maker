@@ -5,6 +5,11 @@ window.addEventListener('load', async () => {
   /* 无头 Chrome 的虚拟时间里几乎不出动画帧：由测试自己驱动 K.tick（与 requestAnimationFrame 循环做的事完全相同） */
   const frames = async (k) => { for (let i = 0; i < k; i++) { await new Promise((r) => setTimeout(r, 16)); K.tick(performance.now()); } };
   const wait = async (ms) => { await new Promise((r) => setTimeout(r, ms)); await frames(2); };
+  /* Worker / 视频编码器在别的线程里干活，不归无头 Chrome 的虚拟时间管：虚拟时钟会抢跑，等它们时要用忙等把真实时间耗掉。
+     untilReal = 等条件成立；real(promise) = 等一个要靠别的线程才能完成的 Promise */
+  const spin = () => { let x = 0; for (let i = 0; i < 3e6; i++) x += i; return x; };
+  const untilReal = async (cond, tries) => { for (let i = 0; i < (tries || 4000) && !cond(); i++) { spin(); await new Promise((r) => setTimeout(r, 1)); } return cond(); };
+  const real = async (p) => { let d = 0, v; p.then((x) => { v = x; d = 1; }, (x) => { v = x; d = 2; }); await untilReal(() => d); if (d !== 1) throw v || new Error('timeout'); return v; };
   const until = async (cond, tries) => { for (let i = 0; i < (tries || 60) && !cond(); i++) await wait(50); return cond(); };
   let n = 0;
   const ok = (name, cond, detail) => { n++; if (!cond) fails.push(detail === undefined ? name : name + ' :: ' + JSON.stringify(detail)); };
@@ -610,12 +615,28 @@ window.addEventListener('load', async () => {
         const w0 = K.ZIP_WARN; K.ZIP_WARN = 1; zb2.click(); await until(() => document.querySelector('dialog.small'), 100);
         const bd = document.querySelector('dialog.small'); ok('zipBigWarning', !!bd && bd.textContent.includes(K.t('zip.bigTitle')) && /MB|GB/.test(bd.textContent), bd && bd.textContent);
         bd.querySelector('.dacts button').click(); await frames(3); ok('zipBigCancelDownloadsNothing', !dl.length && !document.getElementById('bZip').disabled); K.ZIP_WARN = w0;
-        zb2.click(); await until(() => dl.length && !zb2.disabled, 300);
+        zb2.click(); await untilReal(() => dl.length && !zb2.disabled);
         const ZE = dl.length ? await parseZip(dl[0][1]) : null; K.download = od;
         out.zipE2E = ZE && { name: dl[0][0], n: ZE.entries.length, first: ZE.entries[0].name, bytes: ZE.entries.map((x) => x.size) };
         ok('zipExportFileName', dl.length === 1 && dl[0][0] === 'lyrics_png.zip', dl.map((x) => x[0]));
         ok('zipExportContents', ZE && ZE.ok && ZE.entries.length === 5 && ZE.entries.map((x) => x.name).join() === 'lyrics_000001.png,lyrics_000002.png,lyrics_000003.png,lyrics_000004.png,lyrics_000005.png' && ZE.entries.every((x) => x.crcOk && x.stored && x.data[0] === 0x89 && x.data[1] === 0x50 && x.data[2] === 0x4e && x.data[3] === 0x47), out.zipE2E);
-        ok('zipExportMessage', document.getElementById('expMsg').textContent === K.t('exp.doneZip', { n: 5, w: K.S().W, h: K.S().H, fps: 24, t0: 28, z: 1 }), document.getElementById('expMsg').textContent); }
+        ok('zipExportMessage', document.getElementById('expMsg').textContent === K.t('exp.doneZip', { n: 5, w: K.S().W, h: K.S().H, fps: 24, t0: 28, z: 1 }), document.getElementById('expMsg').textContent);
+        /* 画面指纹：空白是 ''；正在擦的两帧不同；同一时刻相同 */
+        { const W = K.S().W, H = K.S().H; ok('frameKey', K.frameKey(0, W, H) === '' && K.frameKey(28, W, H) !== '' && K.frameKey(28, W, H) === K.frameKey(28, W, H) && K.frameKey(28, W, H) !== K.frameKey(28.1, W, H), K.frameKey(28, W, H)); }
+        /* PNG 编码线程池：Worker 里编出来的是真正的 PNG，尺寸对 */
+        { const pool = await real(K.pngPool(2)); out.pngPool = !!pool;
+          if (pool) { K.render(g2.getContext('2d'), 28, { bg: 'none' }); const b = await real(createImageBitmap(g2).then((x) => pool.encode(x))), bm = await real(createImageBitmap(b)), h = new Uint8Array(await real(b.slice(0, 4).arrayBuffer()));
+            ok('pngPoolEncodes', b.type === 'image/png' && h.join() === '137,80,78,71' && bm.width === g2.width && bm.height === g2.height && b.size > 1000, [b.type, b.size]); pool.close(); } }
+        /* 端到端：点“导出视频 (MP4)…”，得到结构完整的 MP4（ftyp + mdat + moov，帧数对） */
+        { const W = K.S().W + (K.S().W & 1), H = K.S().H + (K.S().H & 1), cfg = await real(K.videoConfig(W, H, 24)), vb = document.getElementById('bMp4'), msg = document.getElementById('expMsg'); out.mp4Cfg = cfg && cfg.codec;
+          ok('mp4ButtonPresent', !!vb && !vb.hidden);
+          if (cfg) { const dv = []; K.download = (b, nm) => dv.push([nm, b]); msg.textContent = ''; vb.click(); await untilReal(() => dv.length && !vb.disabled); K.download = od;
+            const u = dv.length ? new Uint8Array(await real(dv[0][1].arrayBuffer())) : new Uint8Array(0), d = new DataView(u.buffer), tag = (o) => String.fromCharCode(u[o + 4], u[o + 5], u[o + 6], u[o + 7]), top = [];
+            for (let o = 0; o + 8 <= u.length;) { const s = d.getUint32(o) === 1 ? d.getUint32(o + 8) * 4294967296 + d.getUint32(o + 12) : d.getUint32(o); top.push(tag(o)); if (s < 8) break; o += s; if (o === u.length) top.push('END'); }
+            const find = (t) => { for (let i = 0; i + 4 <= u.length; i++) if (u[i] === t.charCodeAt(0) && u[i + 1] === t.charCodeAt(1) && u[i + 2] === t.charCodeAt(2) && u[i + 3] === t.charCodeAt(3)) return i; return -1; }, sz = find('stsz');
+            out.mp4 = { name: dv[0] && dv[0][0], bytes: u.length, top, frames: sz > 0 ? d.getUint32(sz + 12) : -1, msg: msg.textContent };
+            ok('mp4Export', dv.length === 1 && dv[0][0] === 'lyrics.mp4' && top.join() === 'ftyp,mdat,moov,END' && out.mp4.frames === 5 && find('avcC') > 0 && find('co64') > 0, out.mp4);
+            ok('mp4ExportMessage', msg.textContent === K.t('exp.doneMp4', { n: 5, w: W, h: H, fps: 24, t0: 28, size: K.fmtBytes(u.length) }), msg.textContent); } } }
       K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false;
     }
 

@@ -236,6 +236,7 @@
   let cancel = false;
   const expBg = () => ($('eBg').value === 'color' ? 'color' : 'none');
   /* zip = true：不用文件夹，打成 ZIP 下载（太多帧时分成多个 ZIP，见 zip.js） */
+  const busy = (on) => { $('bCancel').hidden = !on; $('bPng').disabled = $('bZip').disabled = $('bMp4').disabled = on; };
   async function exportPng(zip) {
     let dir = null;
     if (!zip) {
@@ -253,18 +254,55 @@
       if (est.bytes > K.ZIP_WARN && !(await K.zipConfirm(est, Math.ceil(n / per)))) return;
       sink = K.zipSink({ total: n, per, base: 'lyrics_png', save: (b, name) => K.download(b, name) });
     }
-    let blank = null; cancel = false; $('bCancel').hidden = false; $('bPng').disabled = $('bZip').disabled = true; const st = performance.now();
+    cancel = false; busy(true); const st = performance.now();
+    /* 主线程只画；PNG 编码交给线程池（pngpool.js），写文件 / 进 ZIP 也不挡着下一帧。
+       同时在途的帧数有上限（每帧一份未压缩的位图）；没有线程池的浏览器退回逐帧 toBlob。
+       画面和上一帧一模一样（指纹相同：静止的歌词、空白）就不重画不重编，直接复用上一帧的 PNG */
+    const pool = await K.pngPool(), lim = pool ? pool.size + 2 : 1, live = new Set();
+    let blank = null, lastKey = null, lastP = null, tail = Promise.resolve(), err = null, f = 0;
     try {
-      for (let f = 0; f < n; f++) {
-        if (cancel) { await sink.end(); $('expMsg').textContent = T(zip ? 'exp.cancelledZip' : 'exp.cancelled', { n: f }); break; }
-        const drew = K.render(g, t0 + f / fps, { bg });
-        const blob = drew ? await toBlob() : blank || (blank = await toBlob());
-        await sink.put(`lyrics_${String(f + 1).padStart(6, '0')}.png`, blob);
+      for (; f < n && !cancel && !err; f++) {
+        const t = t0 + f / fps, key = K.frameKey(t, S.W, S.H);
+        let bp = key === lastKey ? lastP : key === '' ? blank : null;
+        if (!bp) {
+          K.render(g, t, { bg });
+          bp = pool ? pool.encode(await createImageBitmap(c)) : toBlob();     // 等位图取走这一帧，再画下一帧
+          bp.catch(() => {}); if (key === '') blank = bp;
+        }
+        lastKey = key; lastP = bp;
+        const name = `lyrics_${String(f + 1).padStart(6, '0')}.png`, put = (b) => sink.put(name, b);
+        /* ZIP 要按帧号顺序写（分卷按顺序切）；写文件夹不分先后，几个文件同时写 */
+        const job = (zip ? (tail = tail.then(() => bp).then(put)) : bp.then(put)).catch((e) => { err = err || e; });
+        live.add(job); job.then(() => live.delete(job));
+        while (live.size >= lim) await Promise.race(live);
         if (f % 10 === 0) { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); await new Promise((r) => setTimeout(r)); }
       }
-      if (!cancel) { await sink.end(); $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
+      await Promise.all(live); if (err) throw err;
+      await sink.end();
+      if (cancel) $('expMsg').textContent = T(zip ? 'exp.cancelledZip' : 'exp.cancelled', { n: f });
+      else { $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T(zip ? 'exp.doneZip' : 'exp.done', { n, w: S.W, h: S.H, fps, t0, z: sink.files() }); }
+    } catch (e) { await Promise.all(live); $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
+    if (pool) pool.close();
+    busy(false);
+  }
+  /* 直接导出 MP4（H.264）：比 PNG 序列小得多也快得多，但没有透明通道——背景选“透明”时用抠像色铺底（和录屏一样） */
+  async function exportMp4() {
+    const S = K.S(), fps = +S.fps, t0 = parseFloat($('eStart').value) || 0, t1 = parseFloat($('eEnd').value) || K.dur();
+    const n = Math.max(1, Math.round((t1 - t0) * fps)), bg = expBg() === 'color' ? 'color' : 'key';
+    const W = S.W + (S.W & 1), H = S.H + (S.H & 1), cfg = await K.videoConfig(W, H, fps);            // H.264 的宽高必须是偶数
+    if (!cfg) { K.toast(T('exp.noVideo'), 'error'); return; }
+    await K.ensureFont();
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    cancel = false; busy(true); const st = performance.now(); let lastKey = null;
+    try {
+      const r = await K.encodeVideo({ canvas: c, cfg, fps, frames: n, cancelled: () => cancel,
+        draw: (f) => { const t = t0 + f / fps, key = K.frameKey(t, W, H); if (key !== lastKey) K.render(g, t, { bg }); lastKey = key; },
+        progress: (f) => { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); } });
+      K.download(r.blob, 'lyrics.mp4');
+      if (!cancel) $('prog').firstElementChild.style.width = '100%';
+      $('expMsg').textContent = T(cancel ? 'exp.cancelledMp4' : 'exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) });
     } catch (e) { $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
-    $('bCancel').hidden = true; $('bPng').disabled = $('bZip').disabled = false;
+    busy(false);
   }
   function exportFrame() {
     const S = K.S(), c = document.createElement('canvas'); c.width = S.W; c.height = S.H;
@@ -359,7 +397,7 @@
     setTool(K.pref('tool'));
     $('bRec').onclick = () => { Y.settings(false); document.body.classList.add('rec'); document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); };
     document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('rec'); });
-    $('bPng').onclick = () => exportPng(false); $('bZip').onclick = () => exportPng(true); $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
+    $('bPng').onclick = () => exportPng(false); $('bZip').onclick = () => exportPng(true); $('bMp4').onclick = exportMp4; $('bFrame').onclick = exportFrame; $('bCancel').onclick = () => (cancel = true);
     if (!window.showDirectoryPicker) { $('bPng').hidden = true; $('bZip').classList.add('pri'); $('bPng').classList.remove('pri'); }      // 没有文件夹 API：ZIP 就是主要方式
     K.bindLyricExport();
 

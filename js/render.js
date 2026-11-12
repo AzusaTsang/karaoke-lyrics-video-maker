@@ -227,6 +227,15 @@
     vis.forEach((v) => { drawLine(g, v.l, v.G, te, v.a); drawDots(g, v.l, v.I, v.G, te, v.a); });
     return vis.length > 0;
   };
+  /* 一帧画面的“指纹”（t 为媒体时间）：两帧指纹相同 = K.render 画出来一模一样，导出时直接复用上一帧的 PNG；没有歌词时是 ''。
+     画面只随这几样变：哪些行可见、各自的透明度（淡入淡出）、擦到哪、预备点走到哪（开始前 / 结束后是静止的） */
+  K.frameKey = (t, W, H) => {
+    const te = t - K.S().offset;
+    return K.visible(te, W, H).map((v) => {
+      const s0 = K.ls(v.l), d = v.I.dotsDur;
+      return [v.l.id, v.a, K.progressEdge(v.l, v.G.L, te), d && te < s0 ? Math.max(0, te - (s0 - d)) : -1].join(':');
+    }).join('|');
+  };
   /* 全局字体 + 各行自己的字体（行属性）都要加载 */
   K.ensureFont = async () => {
     const sample = [...new Set(K.project.lines.map(K.lineText).join('') + 'あ')].join(''), fb = new Set([K.fontBase()]), fr = new Set([K.fontRuby()]);

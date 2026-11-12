@@ -636,7 +636,10 @@ window.addEventListener('load', async () => {
             const find = (t) => { for (let i = 0; i + 4 <= u.length; i++) if (u[i] === t.charCodeAt(0) && u[i + 1] === t.charCodeAt(1) && u[i + 2] === t.charCodeAt(2) && u[i + 3] === t.charCodeAt(3)) return i; return -1; }, sz = find('stsz');
             out.mp4 = { name: dv[0] && dv[0][0], bytes: u.length, top, frames: sz > 0 ? d.getUint32(sz + 12) : -1, msg: msg.textContent };
             ok('mp4Export', dv.length === 1 && dv[0][0] === 'lyrics.mp4' && top.join() === 'ftyp,mdat,moov,END' && out.mp4.frames === 5 && find('avcC') > 0 && find('co64') > 0, out.mp4);
-            ok('mp4ExportMessage', msg.textContent === K.t('exp.doneMp4', { n: 5, w: W, h: H, fps: 24, t0: 28, size: K.fmtBytes(u.length) }), msg.textContent); } } }
+            ok('mp4ExportMessage', msg.textContent === K.t('exp.doneMp4', { n: 5, w: W, h: H, fps: 24, t0: 28, size: K.fmtBytes(u.length) }), msg.textContent);
+            /* 导出提示跟着界面语言走 */
+            const zhMsg = msg.textContent; K.setLang('en'); await frames(1); const enMsg = msg.textContent; K.setLang('zh-CN'); await frames(1);
+            ok('exportMessageFollowsLanguage', enMsg !== zhMsg && enMsg === K.I18N.en['exp.doneMp4'].replace(/\{(\w+)\}/g, (m, k) => ({ n: 5, w: W, h: H, fps: 24, t0: 28, size: K.fmtBytes(u.length) })[k]) && msg.textContent === zhMsg, [zhMsg, enMsg]); } } }
       K.setProject(K.normalizeProject(K.SAMPLES[0].project)); K.dirty = false;
     }
 

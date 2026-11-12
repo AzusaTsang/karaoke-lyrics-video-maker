@@ -298,9 +298,8 @@
       const r = await K.encodeVideo({ canvas: c, cfg, fps, frames: n, cancelled: () => cancel,
         draw: (f) => { const t = t0 + f / fps, key = K.frameKey(t, W, H); if (key !== lastKey) K.render(g, t, { bg }); lastKey = key; },
         progress: (f) => { $('prog').firstElementChild.style.width = (100 * f) / n + '%'; $('expMsg').textContent = T('exp.progress', { i: f + 1, n, s: ((performance.now() - st) / 1000).toFixed(0) }); } });
-      K.download(r.blob, 'lyrics.mp4');
-      if (!cancel) $('prog').firstElementChild.style.width = '100%';
-      $('expMsg').textContent = T(cancel ? 'exp.cancelledMp4' : 'exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) });
+      if (!r) $('expMsg').textContent = T('exp.cancelledMp4');             // 取消：半截视频没用，不保存
+      else { K.download(r.blob, 'lyrics.mp4'); $('prog').firstElementChild.style.width = '100%'; $('expMsg').textContent = T('exp.doneMp4', { n: r.frames, w: W, h: H, fps, t0, size: K.fmtBytes(r.blob.size) }); }
     } catch (e) { $('expMsg').textContent = T('exp.failed', { msg: e.message }); }
     busy(false);
   }

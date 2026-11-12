@@ -51,7 +51,7 @@
   };
 
   /* 编码一段视频：draw(f) 把第 f 帧画到 canvas 上（画面没变可以什么都不画）。
-     o: { canvas, cfg, fps, frames, draw, progress(f), cancelled() } → Promise({ blob, frames })；取消时返回已经编好的部分 */
+     o: { canvas, cfg, fps, frames, draw, progress(f), cancelled() } → Promise({ blob, frames })；取消时是 null */
   K.encodeVideo = async (o) => {
     const ts = Math.round(o.fps * 1000), mux = new K.Mp4Writer({ W: o.cfg.width, H: o.cfg.height, timescale: ts, delta: 1000 });
     let avcC = null, cs = null, err = null;
@@ -73,6 +73,7 @@
         while (enc.encodeQueueSize > 8 && !err) await new Promise((r) => setTimeout(r, 1));     // 编码器跟不上时等一等，别把未压缩的帧堆在内存里
         if (f % 10 === 0) { o.progress(f); await new Promise((r) => setTimeout(r)); }
       }
+      if (o.cancelled()) return null;                           // 取消 = 整个不要了：不收尾、不出文件
       if (!err) await enc.flush();
     } finally { try { enc.close(); } catch (e) {} }
     if (err) throw err;

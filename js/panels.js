@@ -84,6 +84,7 @@
       <h4>${et('line.gText')}</h4>
       <label class="blk" for="lnText">${et('line.text')}</label>
       <textarea id="lnText" data-k="text" rows="${Math.min(8, Math.max(2, K.nRows(l) + (K.nRows(l) > 1 ? 1 : 0)))}" spellcheck="false">${esc(K.unitsToText(l.units))}</textarea>
+      <div class="hint">${et('line.rubyHint')}</div>
       <div class="hint">${et('line.brkHint')}</div>
       <div class="btns"><button data-a="furi" title="${et('line.furiTip')}">${et('line.furi')}</button></div>
       <h4>${et('line.gTiming')}</h4>
@@ -133,7 +134,7 @@
       /* 出现 / 消失时间：清空 = 恢复自动 */
       else if (d.k === 'showAt') { const v2 = parseFloat(v); K.ops.set(l, 'showAt', isFinite(v2) ? Math.min(v2, K.ls(l) - 0.05) : null); }
       else if (d.k === 'hideAt') { const v2 = parseFloat(v); K.ops.set(l, 'hideAt', isFinite(v2) ? Math.max(v2, K.ls(l) + 0.1) : null); }
-      else if (d.r != null) { l.units[+d.r].r = v || null; K.commit('text'); }
+      else if (d.r != null) { K.setRuby(l, +d.r, v.replace(/[{}\r\n]/g, '').trim().slice(0, 64)); K.commit('text'); }
       else if (d.b != null) { const b = K.bounds(l)[+d.b]; if (b && !isNaN(parseFloat(v))) { K.setBoundary(l, b.i, b.j, parseFloat(v)); K.commit('timing'); } }
     });
     el.addEventListener('click', (e) => {

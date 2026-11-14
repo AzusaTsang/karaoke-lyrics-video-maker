@@ -67,7 +67,7 @@
   F.applyToLine = (l, plan, overwrite) => {
     const old = l.units, oa = [], oldAt = []; let pos = 0;
     old.forEach((u, j) => { oa.push(pos); const n = len(u.t); for (let k = 0; k < n; k++) oldAt.push(j); pos += n; });
-    const locked = old.map((u) => !!u.r && !overwrite), items = [];
+    const locked = old.map((u) => !!u.r && (!overwrite || !HAS_KANJI.test(u.t))), items = [];      // 手写在非汉字（西文单词、假名…）上的注音词典给不出来，替换时也保留
     plan.specs.forEach((sp) => {
       if (sp.r && !(() => { for (let k = sp.a; k < sp.b; k++) if (locked[oldAt[k]]) return true; return false; })()) { items.push(sp); return; }
       Array.from(sp.t).forEach((c, i) => items.push({ a: sp.a + i, b: sp.a + i + 1, t: c, r: null }));      // 与已有注音冲突 / 没有注音：逐字

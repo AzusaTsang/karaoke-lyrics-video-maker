@@ -52,7 +52,7 @@
     'menu.dup': '复制为和声行（同时显示、同时擦除）', 'menu.split': '在播放头处拆分', 'menu.merge': '与下一行合并',
     'menu.resetShow': '显示 / 消失时间恢复自动', 'menu.del': '删除这一行', 'menu.add': '在此处添加歌词行',
     'line.help_html': "在预览、时间线或左侧列表里点选一行歌词。<br><br>· 预览里拖动<b>擦除光标</b>（竖线+圆点）可直接校时<br>· 时间线里拖动块 = 整行平移；拖下半部的小竖线 = 调单个字 / 音节<br>· 拖块两侧的细边 = 这一行何时出现 / 消失<br>· 右键块 = 分段、预备点、和声行、拆分合并",
-    'line.text': '歌词（注音写法：漢字{かんじ}）',
+    'line.text': '歌词（注音写法：漢字{かんじ}、KING{キング}）',
     'line.startEnd': '开始 / 结束', 'line.rowAlign': '行位 / 对齐',
     'line.rowAutoN': '自动（第{n}行）', 'line.rowN': '第 {n} 行',
     'line.alignAuto': '自动', 'line.left': '靠左', 'line.center': '居中', 'line.right': '靠右',
@@ -182,7 +182,7 @@
     /* ---- 添加歌词 / LRC / ZIP 导出 / 自动注音 ---- */
     'imp.paste': '粘贴 / 输入歌词…', 'imp.file': '导入 SRT / LRC / JSON 文件…',
     'w.paste': '粘贴歌词', 'w.pasteDesc': '把歌词粘贴进来，一行一句，自动排好时间',
-    'pl.title': '添加歌词', 'pl.lead': '把歌词粘贴到下面，一行一句，空行表示分段。汉字词后面可以用 漢字{かんじ} 的写法加注音。',
+    'pl.title': '添加歌词', 'pl.lead': '把歌词粘贴到下面，一行一句，空行表示分段。词后面可以用 漢字{かんじ}、KING{キング} 的写法加注音；多个词或混合文字用方括号：[New York]{ニューヨーク}。',
     'pl.textLabel': '歌词', 'pl.placeholder': '例：\n夜空に光る星{ほし}の\n約束{やくそく}を忘れない\n\n（空一行 = 新的段落）',
     'pl.count': '{n} 行 · {p} 段 · 约 {s} 秒', 'pl.countNone': '还没有内容',
     'pl.tooMany': '一次最多添加 {max} 行，多出的会被忽略。', 'pl.mode': '添加方式',
@@ -225,6 +225,7 @@
     'tip.syl': "音节「{s}」（{w}）", 'menu.sylSplit': "在此处拆分音节…", 'menu.sylMerge': "与前一个音节合并", 'menu.sylReset': "音节恢复为自动划分", 'menu.evenSyl': "音节内字母均分（这一行）", 'menu.evenSylAll': "音节内字母均分（全部歌词）", 'line.evenSyl': "音节内字母均分", 'line.evenSylTip': "音节开头不动，把每个音节里的字母在它和下一个音节之间平均分配（修复挤在一起的字母）；词里几个音节挤在同一时刻时，先把它们在词里摊开", 'line.sylMenu': "音节：拆分 / 合并", 'line.syl_html': "拉丁、西里尔、希腊字母按<b>音节</b>定时（自动划分）。点「⋯」或右键音节行可拆分 / 合并；也可以在歌词文字里两个字母之间写 <code>|</code> 来分开音节，如 <code>Fon|taine</code>。", 'u.syl': "修改音节划分", 'u.evenSyl': "音节内字母均分", 'msg.evenSyl': "已均分 {n} 行的音节内字母", 'msg.evenSylNone': "没有需要调整的音节",
 
     /* ---- 本行独立样式（行属性）/ 行内换行 ---- */
+    'line.rubyHint': '注音写在 {…} 里，加在它前面的那段汉字、那个西文单词或那串假名上；多个词或混合文字用方括号括起来：[New York]{ニューヨーク}。字母写的注音一串算一拍，用空格或 | 分拍（| 不显示）：漢字{ka|n|ji}。',
     'line.brkHint': 'Shift+Enter（或输入 \\n）= 在这一行里换行，分成几排显示；可配合下面「本行独立样式」里的位置偏移调整。',
     'line.gStyle': '本行独立样式', 'line.ovCount': '已改 {n} 项',
     'line.ovLead': '这里的设置只影响这一行。没改过的项显示全局设置（「样式」「版面」页），改了就成为这一行自己的值（橙色标出）；点 ↺ 恢复使用全局设置。',
@@ -294,7 +295,7 @@
     'menu.dup': 'ハモリ行として複製（同時に表示・同時にワイプ）', 'menu.split': '再生位置で分割', 'menu.merge': '次の行と結合',
     'menu.resetShow': '表示・消去タイミングを自動に戻す', 'menu.del': 'この行を削除', 'menu.add': 'ここに歌詞の行を追加',
     'line.help_html': "プレビュー、タイムライン、または左のリストで歌詞の行をクリックして選択します。<br><br>· プレビューで<b>ワイプカーソル</b>（縦線＋丸）をドラッグすると、その場でタイミングを調整<br>· タイムラインでブロックをドラッグ = 行全体を移動、下半分の短い縦線 = 1 文字 / 1 音節ずつ調整<br>· ブロック両端の細い縁 = その行を表示 / 消去するタイミング<br>· ブロックを右クリック = 段落、カウントイン、ハモリ行、分割・結合",
-    'line.text': '歌詞（ルビの書き方：漢字{かんじ}）',
+    'line.text': '歌詞（ルビの書き方：漢字{かんじ}、KING{キング}）',
     'line.startEnd': '開始 / 終了', 'line.rowAlign': '段 / 揃え',
     'line.rowAutoN': '自動（{n}）', 'line.rowN': '{n} 段目',
     'line.alignAuto': '自動', 'line.left': '左揃え', 'line.center': '中央', 'line.right': '右揃え',
@@ -424,7 +425,7 @@
     /* ---- 添加歌词 / LRC / ZIP 导出 / 自动注音 ---- */
     'imp.paste': '歌詞を貼り付け・入力…', 'imp.file': 'SRT・LRC・JSON ファイルを読み込む…',
     'w.paste': '歌詞を貼り付け', 'w.pasteDesc': '歌詞を貼り付けると、1 行ずつ自動でタイミングが並びます',
-    'pl.title': '歌詞を追加', 'pl.lead': '歌詞を 1 行 1 フレーズで貼り付けてください。空行は段落の区切りになります。漢字の語のあとに 漢字{かんじ} の形でルビも書けます。',
+    'pl.title': '歌詞を追加', 'pl.lead': '歌詞を 1 行 1 フレーズで貼り付けてください。空行は段落の区切りになります。語のあとに 漢字{かんじ}、KING{キング} の形でルビも書けます。複数の語や文字種が混ざる範囲は角かっこで囲みます：[New York]{ニューヨーク}。',
     'pl.textLabel': '歌詞', 'pl.placeholder': '例：\n夜空に光る星{ほし}の\n約束{やくそく}を忘れない\n\n（空行 = 新しい段落）',
     'pl.count': '{n} 行 · {p} 段落 · 約 {s} 秒', 'pl.countNone': 'まだ入力がありません',
     'pl.tooMany': '一度に追加できるのは {max} 行までです。超えた分は無視されます。', 'pl.mode': '追加の仕方',
@@ -467,6 +468,7 @@
     'tip.syl': "音節「{s}」（{w}）", 'menu.sylSplit': "ここで音節を分ける…", 'menu.sylMerge': "前の音節と結合", 'menu.sylReset': "音節を自動に戻す", 'menu.evenSyl': "音節内の文字を均等に（この行）", 'menu.evenSylAll': "音節内の文字を均等に（すべての歌詞）", 'line.evenSyl': "音節内の文字を均等に", 'line.evenSylTip': "音節の開始はそのままで、各音節の文字を次の音節までの間に均等に割り振ります（重なった文字の修復）。単語内の複数の音節が同じ時刻に重なっている場合は、先に単語内に広げます", 'line.sylMenu': "音節：分割 / 結合", 'line.syl_html': "ラテン・キリル・ギリシャ文字は<b>音節</b>ごとにタイミングを合わせます（自動で区切ります）。「⋯」または音節の行を右クリックで分割 / 結合。歌詞テキストの文字と文字の間に <code>|</code> を書いて区切ることもできます（例：<code>Fon|taine</code>）。", 'u.syl': "音節の区切りを変更", 'u.evenSyl': "音節内の文字を均等に", 'msg.evenSyl': "{n} 行の音節内の文字を均等にしました", 'msg.evenSylNone': "調整が必要な音節はありません",
 
     /* ---- この行だけのスタイル / 行内改行 ---- */
+    'line.rubyHint': 'ルビは {…} に書き、直前の漢字の連なり・欧文の単語・かなの連なりに付きます。複数の語や文字種が混ざる範囲は角かっこで囲みます：[New York]{ニューヨーク}。アルファベットで書いたルビはひと続きで 1 拍になり、空白か |（表示されません）で拍を区切ります：漢字{ka|n|ji}。',
     'line.brkHint': 'Shift+Enter（または \\n と入力）でこの行の中で改行し、複数段に分けて表示します。下の「この行だけのスタイル」の位置オフセットと組み合わせて調整できます。',
     'line.gStyle': 'この行だけのスタイル', 'line.ovCount': '{n} 項目を変更',
     'line.ovLead': 'ここでの設定はこの行にだけ効きます。変更していない項目には全体の設定（「スタイル」「レイアウト」タブ）が表示され、変更するとこの行専用の値になります（オレンジで表示）。↺ で全体の設定に戻ります。',
@@ -536,7 +538,7 @@
     'menu.dup': 'Duplicate as harmony line (shown and wiped together)', 'menu.split': 'Split at playhead', 'menu.merge': 'Merge with next line',
     'menu.resetShow': 'Reset show / hide times to auto', 'menu.del': 'Delete this line', 'menu.add': 'Add a lyric line here',
     'line.help_html': "Select a lyric line in the preview, the timeline or the list on the left.<br><br>· Drag the <b>wipe cursor</b> (line + dot) in the preview to retime on the spot<br>· On the timeline, drag a block to move the whole line; drag the small ticks in its lower half to adjust single characters or syllables<br>· The thin edges on either side set when the line appears / disappears<br>· Right-click a block for paragraphs, count-in dots, harmony lines, split and merge",
-    'line.text': 'Lyrics (furigana: 漢字{かんじ})',
+    'line.text': 'Lyrics (ruby: 漢字{かんじ}, KING{キング})',
     'line.startEnd': 'Start / End', 'line.rowAlign': 'Row / Align',
     'line.rowAutoN': 'Auto ({n})', 'line.rowN': 'Row {n}',
     'line.alignAuto': 'Auto', 'line.left': 'Left', 'line.center': 'Center', 'line.right': 'Right',
@@ -666,7 +668,7 @@
     /* ---- 添加歌词 / LRC / ZIP 导出 / 自动注音 ---- */
     'imp.paste': 'Paste or type lyrics…', 'imp.file': 'Import an SRT / LRC / JSON file…',
     'w.paste': 'Paste lyrics', 'w.pasteDesc': 'Paste your lyrics, one line per row, and they are laid out ready for timing',
-    'pl.title': 'Add lyrics', 'pl.lead': 'Paste your lyrics below, one line per row; a blank line starts a new paragraph. After a kanji word you can add furigana as 漢字{かんじ}.',
+    'pl.title': 'Add lyrics', 'pl.lead': 'Paste your lyrics below, one line per row; a blank line starts a new paragraph. After a word you can add a reading (ruby) as 漢字{かんじ} or KING{キング}; put square brackets around several words or mixed scripts: [New York]{ニューヨーク}.',
     'pl.textLabel': 'Lyrics', 'pl.placeholder': 'Example:\n夜空に光る星{ほし}の\n約束{やくそく}を忘れない\n\n(a blank line starts a new paragraph)',
     'pl.count': '{n} lines · {p} paragraphs · about {s} s', 'pl.countNone': 'Nothing to add yet',
     'pl.tooMany': 'At most {max} lines are added at a time; the rest are ignored.', 'pl.mode': 'Add',
@@ -709,6 +711,7 @@
     'tip.syl': "syllable “{s}” ({w})", 'menu.sylSplit': "Split syllable here…", 'menu.sylMerge': "Merge with previous syllable", 'menu.sylReset': "Reset syllables to automatic", 'menu.evenSyl': "Even out letters within syllables", 'menu.evenSylAll': "Even out letters within syllables (all lines)", 'line.evenSyl': "Even out letters within syllables", 'line.evenSylTip': "Keeps syllable starts and spreads each syllable's letters evenly up to the next syllable (repairs letters piled onto one timestamp); syllables of a word that sit on the same instant are first spread across the word", 'line.sylMenu': "Syllable: split / merge", 'line.syl_html': "Latin, Cyrillic and Greek text is timed by <b>syllable</b> (split automatically). Use “⋯” or right-click a syllable row to split or merge; you can also type <code>|</code> between two letters in the lyric text, e.g. <code>Fon|taine</code>.", 'u.syl': "Change syllables", 'u.evenSyl': "Even out letters within syllables", 'msg.evenSyl': "Evened out the letters within syllables in {n} line(s)", 'msg.evenSylNone': "Nothing to change in the syllables",
 
     /* ---- This line's own style (line properties) / line breaks inside a line ---- */
+    'line.rubyHint': 'A reading in {…} goes above the kanji run, word or kana run right before it. Put square brackets around several words or mixed scripts: [New York]{ニューヨーク}. A reading written in letters is one beat per run; split beats with a space or | (not shown), as in {ka|n|ji}.',
     'line.brkHint': 'Shift+Enter (or typing \\n) breaks this line into several rows. Combine it with the position offset under "This line\'s own style" below to fine-tune the layout.',
     'line.gStyle': 'This line\'s own style', 'line.ovCount': '{n} changed',
     'line.ovLead': 'Settings here affect only this line. Fields you have not changed show the global setting (Style / Layout tabs); once you change one it becomes this line\'s own value (marked orange). ↺ goes back to the global setting.',

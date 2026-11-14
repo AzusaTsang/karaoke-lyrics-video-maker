@@ -666,6 +666,26 @@ window.addEventListener('load', async () => {
       { const l = mkL('王道{おうどう}をGo', 0, 4), B = K.bounds(l);
         ok('sylRubyKanjiUntouched', syl(l) === '<王道>|<を>|Go' && B.length === 4 + 1 + 1 && B.slice(0, 4).every((b, j) => b.i === 0 && b.j === j), [syl(l), B]); }
       { const l = mkL("L'eau s'élève, ô reine!", 0, 5); ok('sylBoundsCount', K.bounds(l).length === 7 && K.bounds(l).every((b) => !b.j), K.bounds(l).length); }
+      // 非汉字 / 西文单词的注音：{…} 前面自动取一个词 / 一串假名；方括号 = 任意范围
+      { const sh = (s) => K.parseText(s).map((u) => u.t + (u.r ? '{' + u.r + '}' : '')).join('|'), rt = (s) => K.unitsToText(K.parseText(s));
+        const pc = { 'HYDRO KING{キング}!': 'H|Y|D|R|O| |KING{キング}|!', "Don't{ドント} stop": "Don't{ドント}| |s|t|o|p", '愛LOVE{ラブ}': '愛|LOVE{ラブ}', 'のハイドロ{hydro}': 'の|ハイドロ{hydro}', 'あなた{きみ}': 'あなた{きみ}',
+          '[New York]{ニューヨーク}へ': 'New York{ニューヨーク}|へ', '愛した[あなた]{きみ}': '愛|し|た|あなた{きみ}', '한국{かんこく}': '한국{かんこく}', 'Fon|taine{テーヌ}': 'F|o|n|taine{テーヌ}', 'été{エテ}': 'été{エテ}', 'a {x} [b] {c}': 'a| |{|x|}| |[|b|]| |{|c|}', '2U{トゥーユー}': '2U{トゥーユー}' };
+        Object.keys(pc).forEach((s) => ok('rubyWordParse:' + s, sh(s) === pc[s], [s, sh(s)]));
+        ok('rubyWordRoundTrip', rt('Fon|taine{テーヌ}') === 'Fon[taine]{テーヌ}' && Object.keys(pc).filter((s) => s[3] !== '|').concat(['abc[def]{x}', 'か[あ]{x}', '[♪]{おんぷ}', '[あの日]{とき}', 'KING{キング}\nQUEEN{クイーン}']).every((s) => rt(s) === s), Object.keys(pc).map(rt));
+        ok('rubyBracketOnlyWhenNeeded', K.unitsToText([{ t: 'ab', r: null }, { t: 'cd', r: 'x' }]) === 'ab[cd]{x}' && K.unitsToText([{ t: 'ab ', r: null }, { t: 'cd', r: 'x' }]) === 'ab cd{x}' && K.unitsToText([{ t: '王道', r: 'おうどう' }, { t: 'KING', r: 'キング' }]) === '王道{おうどう}KING{キング}');
+        // 注音是字母 / 注音符号：一串 = 一拍，空格等分开；假名照旧一个一拍
+        const mo = (r) => K.moras(r).join('/'), mc = { 'zhōng': 'zhōng', 'zhōng guó': 'zhōng /guó', "xi'an": "xi'/an", 'kan-ji': 'kan-/ji', 'ㄓㄨㄥ': 'ㄓㄨㄥ', 'ㄍㄨㄛˊㄐㄧㄚ': 'ㄍㄨㄛˊ/ㄐㄧㄚ', 'ㄓㄨㄥ ㄨㄣˊ': 'ㄓㄨㄥ /ㄨㄣˊ', 'きょう': 'きょ/う', 'キング': 'キ/ン/グ', 'ラブlove': 'ラ/ブ/love', '한국': '한/국', 'zhōng': 'zhōng', ' a b': ' a /b' };
+        Object.keys(mc).forEach((r) => ok('rubyAlphaBeats:' + r, mo(r) === mc[r], [r, mo(r)]));
+        { const lb = mkL('漢字{ka|n|ji}を', 0, 4), u0 = lb.units[0], mcx = document.createElement('canvas').getContext('2d'); mcx.font = K.fontRuby(K.LS(lb));
+          ok('rubyBarBeats', mo('ka|n|ji') === 'ka/n/ji' && mo('zhōng|guó') === 'zhōng/guó' && mo('|a||b|') === 'a/b' && K.rubyText('ka|n|ji') === 'kanji' && K.nMora(u0) === 3 && K.bounds(lb).filter((b) => b.i === 0).length === 3 && K.unitsToText(lb.units) === '漢字{ka|n|ji}を', [mo('ka|n|ji'), K.unitsToText(lb.units)]);
+          ok('rubyBarNotDrawn', Math.abs(K.layout(lb).units[0].rw - (mcx.measureText('kanji').width + K.LS(lb).spacing * 0.5 * 5)) < 0.01, K.layout(lb).units[0].rw);
+          ok('rubyBarOnlyIsNoRuby', K.parseText('字{|}')[0].r === null && (K.setRuby(lb, 0, '||'), lb.units[0].r === null && lb.units[0].t === '漢')); }
+        ok('rubyAlphaBeatsKeepText', Object.keys(mc).every((r) => K.moras(r).join('') === r));
+        const l = mkL('Go KING{キング}!', 0, 4), B = K.bounds(l);
+        ok('rubyWordTimedByMora', syl(l) === 'Go[ ]|<KING>|<!>' && B.filter((b) => b.i === 3).length === 3 && K.layout(l).units[3].rw > 0, [syl(l), B]);
+        K.setRuby(l, 3, null);
+        ok('rubyClearSplitsUnit', K.unitsToText(l.units) === 'Go KING!' && l.units.length === 8 && l.units.slice(3, 7).every((u, k, a) => !u.r && (!k || u.s > a[k - 1].s)) && syl(l) === 'Go[ ]|KING[!]', [l.units, syl(l)]);
+        K.setRuby(l, 7, 'びっくり'); ok('rubySetOnSingle', K.unitsToText(l.units) === 'Go KING[!]{びっくり}', K.unitsToText(l.units)); }
       // ---- 舞台 / 时间线拖动：法语示例 ----
       K.setProject(K.normalizeProject(K.SAMPLES[1].project)); await K.ensureFont(); await wait(60);
       const fl = K.screen().ord[2], fid = fl.id; K.select(fid);

@@ -92,7 +92,7 @@
       if (u.n && i) { rows.push({ a, b: i, off: ro, w: x - ro }); a = i; ro = x; }
       if (rows.length && u.r) rb = true;
       mc.font = fb; const bw = mc.measureText(u.t).width + E.spacing * [...u.t].length;
-      let rw = 0; if (u.r) { mc.font = fr; rw = mc.measureText(u.r).width + E.spacing * 0.5 * [...u.r].length; }
+      let rw = 0; if (u.r) { mc.font = fr; const rt = K.rubyText(u.r); rw = mc.measureText(rt).width + E.spacing * 0.5 * [...rt].length; }
       const w = z[i] ? 0 : Math.max(bw, rw); units.push({ x, w, bw, rw, row: rows.length }); x += w;
     });
     rows.push({ a, b: U.length, off: ro, w: x - ro });
@@ -156,7 +156,7 @@
     for (let i = a; i < b; i++) {
       const u = l.units[i], m = L.units[i];
       if (u.t.trim() !== '') { g.font = fb; paint(g, u.t, m.x + (m.w - m.bw) / 2, 0, high ? S.highFill : S.baseFill, high ? S.highStroke : S.baseStroke, S.strokeW, S.spacing); }
-      if (u.r) { g.font = fr; paint(g, u.r, m.x + (m.w - m.rw) / 2, rubyY, high ? S.rubyHighFill : S.rubyFill, high ? S.rubyHighStroke : S.rubyStroke, S.rubyStrokeW, S.spacing * 0.5); }
+      if (u.r) { g.font = fr; paint(g, K.rubyText(u.r), m.x + (m.w - m.rw) / 2, rubyY, high ? S.rubyHighFill : S.rubyFill, high ? S.rubyHighStroke : S.rubyStroke, S.rubyStrokeW, S.spacing * 0.5); }
     }
   }
   /* 一行 = 一排或几排（行内换行）；擦除从一排的末尾接到下一排的开头（展平坐标里连续） */

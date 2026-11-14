@@ -116,7 +116,25 @@
     return Math.max(n ? n.s : l.end, u.s + 0.02);
   };
   /* 注音按“拍”细分：小假名并入前一拍。带注音的字可以按拍单独定时（u.m = 第 2 拍起各拍的开始时间） */
-  K.moras = (r) => { const out = []; for (const c of r || '') { if (/[ゃゅょぁぃぅぇぉゎャュョァィゥェォヮ]/.test(c) && out.length) out[out.length - 1] += c; else out.push(c); } return out; };
+  /* 注音写成字母（拼音、罗马字…）或注音符号时不能一个字母一拍：连着的一串 = 一拍（一个音节），
+     用空格或 ' ’ · - 分开各拍（分隔符留在前一拍末尾）；注音符号的声调 ˊ ˇ ˋ ˉ 也结束一拍。zhōng guó = 2 拍，ㄓㄨㄥ ㄍㄨㄛˊ = 2 拍，xi'an = 2 拍。
+     和歌词文本里一样，| 也分开各拍但不显示：ka|n|ji = 3 拍，画出来是 kanji。| 留在 u.r 里，显示时用 K.rubyText 去掉 */
+  K.rubyText = (r) => String(r || '').replace(/\|/g, '');
+  const R_ALPHA = /[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Bopomofo}\p{Nd}]/u, R_SEP = /[\s'’·‐‑-]/, R_TONE = /[ˊˇˋˉ]/, R_MARK = /\p{M}/u;
+  K.moras = (r) => {
+    const out = []; let open = false, lead = '';                   // open = 最后一拍是还没结束的字母串；lead = 开头的分隔符，并进第一拍
+    for (const c of r || '') {
+      const n = out.length;
+      if (c === '|') { open = false; continue; }
+      if (R_MARK.test(c) || /[ゃゅょぁぃぅぇぉゎャュョァィゥェォヮ]/.test(c)) { if (n) out[n - 1] += c; else out.push(c); }
+      else if (R_SEP.test(c)) { if (n) out[n - 1] += c; else lead += c; open = false; }
+      else if (R_TONE.test(c) && open) { out[n - 1] += c; open = false; }
+      else if (R_ALPHA.test(c)) { if (open) out[n - 1] += c; else { out.push(lead + c); lead = ''; open = true; } }
+      else { out.push(lead + c); lead = ''; open = false; }
+    }
+    if (lead && !out.length) out.push(lead);
+    return out;
+  };
   K.nMora = (u) => (u.r ? Math.max(1, K.moras(u.r).length) : 1);
   /* 一个字内部的时间节点：[开始, 第2拍, …, 结束]，没有手动定时就平均分 */
   K.subTimes = (l, i) => {
@@ -350,14 +368,20 @@
   K.newLine = (o) => Object.assign({ id: K.newId(), units: [], end: 0, row: null, align: null, newPara: null, dots: null, showAt: null, hideAt: null }, o);
 
   /* ---------- 文本 <-> 单元（注音语法：漢字{かんじ}；音节分隔：两个字母之间的 | ，如 Fon|taine，不显示；
-     行内换行：真正的换行，或者写成两个字符 \n。换行记在下一排第一个单元上：u.n = 1） ---------- */
-  const RUBY_RE = /([々〆ヶ一-鿿]+)\{([^{}]*)\}|([\s\S])/gu, ALPHA1 = new RegExp(`^[${AL}]`, 'u');
+     行内换行：真正的换行，或者写成两个字符 \n。换行记在下一排第一个单元上：u.n = 1）
+     {…} 前面被注音的那一段自动取“同一类的一串字”：一段汉字 / 一个西文单词（字母数字，词中的 ' - 也算）/ 一串片假名 / 一串平假名 /
+     一串其它文字（谚文等）：KING{キング}、Don't{ドント}、ハイドロ{hydro}。要给别的范围加注音（多个词、混合文字、符号）就用方括号括起来：
+     [New York]{ニューヨーク}、愛した[あなた]{きみ}。整段是一个单元，按注音的拍定时 ---------- */
+  const KJ = '々〆ヶ一-鿿', WORD = `[${AL}][${AL}\\p{M}]*(?:['’‐‑-][${AL}][${AL}\\p{M}]*)*`;
+  const RUBY_RE = new RegExp(`\\[([^\\[\\]{}\\r\\n]+)\\]\\{([^{}\\r\\n]+)\\}|([${KJ}]+|${WORD}|[ァ-ヺー]+|[ぁ-ゖゝゞー]+|(?:(?![${KJ}${AL}ぁ-ヺー])[\\p{L}\\p{N}\\p{M}])+)\\{([^{}]*)\\}|([\\s\\S])`, 'gu');
+  const ALPHA1 = new RegExp(`^[${AL}]`, 'u');
   K.parseText = (str) => {
     const out = []; let m, brk = false, nl = false; RUBY_RE.lastIndex = 0; str = String(str == null ? '' : str);
-    const push = (u) => { if (nl && out.length) u.n = 1; nl = false; out.push(u); };
+    const push = (u) => { if (nl && out.length) u.n = 1; nl = false; if (u.r && !K.rubyText(u.r)) u.r = null; out.push(u); };          // 只有 | 的注音 = 没有注音
     while ((m = RUBY_RE.exec(str))) {
-      if (m[1]) { push({ t: m[1], r: m[2] || null }); brk = false; continue; }
-      const c = m[3];
+      if (m[1]) { push({ t: m[1], r: m[2] }); brk = false; continue; }
+      if (m[3]) { push({ t: m[3], r: m[4] || null }); brk = false; continue; }
+      const c = m[5];
       if (c === '\n' || (c === '\\' && str[RUBY_RE.lastIndex] === 'n')) { if (c === '\\') RUBY_RE.lastIndex++; nl = true; brk = false; continue; }
       if (c === '\r') continue;
       const pv = out[out.length - 1];
@@ -366,7 +390,26 @@
     }
     return out;
   };
-  K.unitsToText = (units) => units.map((u, i) => (u.n && i ? '\n' : '') + (u.k === 1 ? '|' : '') + u.t + (u.r ? '{' + u.r + '}' : '')).join('');
+  /* 带注音的单元：直接写 文字{注音} 再读回来不是同一个单元时（前面的字会被一起算进去、或者文字不是“同一类的一串”）用 [文字]{注音} */
+  K.unitsToText = (units) => {
+    let acc = '';                                                  // 这一排里上一个注音 / 音节标记之后的普通文字
+    return units.map((u, i) => {
+      const pre = (u.n && i ? '\n' : '') + (u.k === 1 ? '|' : '');
+      if (pre) acc = '';
+      if (!u.r) { acc += u.t; return pre + u.t; }
+      const back = K.parseText(acc + u.t + '{' + u.r + '}').pop(), plain = back && back.t === u.t && back.r === u.r;
+      acc = '';
+      return pre + (plain ? u.t : '[' + u.t + ']') + '{' + u.r + '}';
+    }).join('');
+  };
+  /* 改一个单元的注音；去掉多字单元的注音时把它拆回一个字一个单元（时间在原来的区间里平均分），和文本框里的写法保持一致 */
+  K.setRuby = (l, i, r) => {
+    const u = l.units[i], cs = Array.from(u.t); r = (r && K.rubyText(r) ? r : null);
+    if (r || cs.length < 2) { u.r = r; K.fixLine(l); return; }
+    const e = K.unitEnd(l, i);
+    l.units.splice(i, 1, ...cs.map((c, k) => Object.assign({ t: c, r: null, s: u.s + ((e - u.s) * k) / cs.length }, k === 0 && u.n ? { n: 1 } : {})));
+    K.fixLine(l);
+  };
   /* 把一行的时间在 [s,e] 内按“有发音的字”平均分配 */
   K.evenSplit = (l, s, e) => {
     s = s == null ? K.ls(l) : s; e = e == null ? l.end : e;
